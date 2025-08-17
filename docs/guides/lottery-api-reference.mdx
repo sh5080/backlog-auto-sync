@@ -1,0 +1,890 @@
+---
+title: '추첨 시스템 API 정의서'
+description: 'LG 멤버십 추첨 시스템의 REST API 엔드포인트 상세 정의'
+icon: 'file-lines'
+---
+
+## 개요
+
+LG 멤버십 추첨 시스템은 공정하고 투명한 추첨을 통해 다양한 혜택을 회원들에게 제공하는 시스템입니다. 하나의 추첨에 대해 여러 번의 실행이 가능하며, 각 실행마다 다른 경품 구성과 참여자로 유연하게 운영할 수 있습니다.
+
+| 리소스                                       | 설명                                 | 예시                                   |
+| -------------------------------------------- | ------------------------------------ | -------------------------------------- |
+| **추첨(Lottery)**                            | 추첨 정의 (전체 경품 풀)             | 6월 뮤지컬 추첨, LG 스타일러 경품 추첨 |
+| **추첨 이력(LotteryHist)**                   | 추첨 실행 이력 (경품 하위셋 및 결과) | 2025년 6월 1일 실행된 추첨 결과        |
+| **추첨 이력 참여자(LotteryHistParticipant)** | 각 추첨 실행의 참여자 정보           | 회원번호 123456이 참여한 추첨 정보     |
+| **추첨 결과(LotteryResult)**                 | 당첨자 발표 (여러 이력 조합)         | 6월 뮤지컬 당첨자 발표                 |
+| **블랙리스트(LotteryBlacklist)**             | 추첨 참여 제한 회원                  | 부정 사용으로 인한 제한 회원           |
+
+모든 API는 관리자 전용으로 제공됩니다.
+
+## API 공통 정보
+
+### 기술 스택
+
+- **백엔드**: tRPC + trpc-openapi, PostgreSQL (Prisma ORM)
+- **API 인터페이스**:
+  - tRPC: 타입 안전성이 보장되는 기본 API 인터페이스
+  - REST: trpc-openapi를 통해 기존 tRPC 라우터를 REST API로도 노출
+- **인증**: JWT 기반
+
+### 인증 및 권한
+
+- **관리자 API**: 모든 API 호출 시 인증 필요(JWT)
+- **권한 레벨**: adminProtectedProcedure (관리자/스태프만 접근 가능)
+
+### 응답 상태 코드
+
+- **성공**: 200 OK (데이터 반환 또는 반환 없음)
+- **에러**: 400, 401, 403, 404, 409, 500 등 상황에 따라 다름
+
+### 페이지네이션 응답 포맷
+
+목록 조회 API는 항상 아래 포맷으로 응답합니다:
+
+```json
+{
+  "list": [
+    // 해당 리소스의 객체 배열
+  ],
+  "page": 1, // [필수] 현재 페이지
+  "pageSize": 20, // [필수] 페이지당 항목 수
+  "pageCount": 5, // [필수] 총 페이지 수
+  "totalCount": 100 // [필수] 총 항목 수
+}
+```
+
+## 주요 데이터 타입 및 스키마
+
+### 추첨 결과 상태 필터 (LotteryResultStatusFilter)
+
+```typescript
+export const LotteryResultStatusFilter = {
+  UPCOMING: 'UPCOMING', // 예정
+  OPEN: 'OPEN', // 응모 중
+  CLOSED: 'CLOSED', // 응모 마감
+  DISPLAYED: 'DISPLAYED', // 결과 발표 중
+  ENDED: 'ENDED', // 종료
+} as const;
+```
+
+### 진행 상태 필터 (ProgressStatusFilter)
+
+```typescript
+export const ProgressStatusFilter = {
+  UPCOMING: 'UPCOMING', // 예정
+  IN_PROGRESS: 'IN_PROGRESS', // 진행 중
+  ENDED: 'ENDED', // 종료
+} as const;
+```
+
+### 추첨 정렬 방식 (OrderBy)
+
+```typescript
+// 추첨 정렬
+export const LotteryOrderBy = {
+  createdAt_asc: 'createdAt_asc',
+  createdAt_desc: 'createdAt_desc',
+  updatedAt_asc: 'updatedAt_asc',
+  updatedAt_desc: 'updatedAt_desc',
+  name_asc: 'name_asc',
+  name_desc: 'name_desc',
+} as const;
+
+// 추첨 이력 정렬
+export const LotteryHistOrderBy = {
+  createdAt_asc: 'createdAt_asc',
+  createdAt_desc: 'createdAt_desc',
+  totalCandidates_asc: 'totalCandidates_asc',
+  totalCandidates_desc: 'totalCandidates_desc',
+  totalWinners_asc: 'totalWinners_asc',
+  totalWinners_desc: 'totalWinners_desc',
+} as const;
+
+// 추첨 이력 참여자 정렬
+export const LotteryHistParticipantOrderBy = {
+  createdAt_asc: 'createdAt_asc',
+  createdAt_desc: 'createdAt_desc',
+  memNo_asc: 'memNo_asc',
+  memNo_desc: 'memNo_desc',
+  memName_asc: 'memName_asc',
+  memName_desc: 'memName_desc',
+} as const;
+
+// 추첨 결과 정렬
+export const LotteryResultOrderBy = {
+  createdAt_asc: 'createdAt_asc',
+  createdAt_desc: 'createdAt_desc',
+  openStartAt_asc: 'openStartAt_asc',
+  openStartAt_desc: 'openStartAt_desc',
+  openEndAt_asc: 'openEndAt_asc',
+  openEndAt_desc: 'openEndAt_desc',
+} as const;
+```
+
+### 추첨 상품 스키마
+
+```typescript
+interface ILotteryPrize {
+  prizeName: string; // 상품명
+  winnerCount: number; // 당첨자 수
+}
+```
+
+### 마스킹 설정
+
+개인정보 보호를 위한 마스킹 설정:
+
+```typescript
+export const LotteryMaskingConfig = {
+  genericStrings: [
+    {
+      fields: ['memName'],
+      config: { unmaskedStartCharacters: 1 },
+    },
+    {
+      fields: ['memNo'],
+      config: { unmaskedStartCharacters: 2 },
+    },
+    {
+      fields: ['phoneNumber'],
+      config: { unmaskedStartCharacters: 5, unmaskedEndCharacters: 4 },
+    },
+  ],
+};
+```
+
+## 공통 에러 코드
+
+| 코드                      | 설명                               | 대응 방법                       |
+| ------------------------- | ---------------------------------- | ------------------------------- |
+| LOTTERY_NOT_FOUND         | 추첨을 찾을 수 없습니다            | 올바른 추첨 ID 확인             |
+| LOTTERY_RESULT_NOT_FOUND  | 당첨자 발표를 찾을 수 없습니다     | 올바른 발표 ID 확인             |
+| LOTTERY_HIST_NOT_FOUND    | 추첨 이력을 찾을 수 없습니다       | 올바른 이력 ID 확인             |
+| BLACKLIST_NOT_FOUND       | 블랙리스트를 찾을 수 없습니다      | 올바른 블랙리스트 ID 확인       |
+| NO_PARTICIPANTS           | 참여자가 없습니다                  | 참여자 추가 후 재시도           |
+| INSUFFICIENT_PARTICIPANTS | 참여자 수가 당첨자 수보다 적습니다 | 참여자 추가 또는 당첨자 수 조정 |
+| TOO_MANY_PARTICIPANTS     | 참여자 수가 너무 많습니다          | 참여자 수 제한 (3만명)          |
+| PRIZE_NOT_FOUND           | 해당 경품을 찾을 수 없습니다       | 올바른 경품명 확인              |
+| PRIZE_EXCEED_LIMIT        | 경품 당첨자 수가 초과합니다        | 경품 당첨자 수 조정             |
+| DUPLICATE_PRIZE_NAME      | 상품명이 중복되었습니다        | 각 상품명을 고유하게 수정       |
+
+## API 엔드포인트
+
+### 1. 추첨(Lottery) 관리
+
+| 메소드 | 엔드포인트                        | 설명           | 인증 |
+| ------ | --------------------------------- | -------------- | ---- |
+| POST   | `/external/admin/lotteries`       | 추첨 목록 조회 | 필요 |
+| GET    | `/external/admin/lottery/get`     | 추첨 상세 조회 | 필요 |
+| POST   | `/external/admin/lottery/create`  | 추첨 생성      | 필요 |
+| POST   | `/external/admin/lottery/update`  | 추첨 수정      | 필요 |
+| POST   | `/external/admin/lottery/delete`  | 추첨 삭제      | 필요 |
+| POST   | `/external/admin/lottery/execute` | 추첨 실행      | 필요 |
+
+### 추첨 목록 조회
+
+- **요청**:
+
+  ```json
+  {
+    // 모두 옵션 필드
+    "search": "6월 뮤지컬", // [옵션] 검색어 (추첨명)
+    "createdAfter": "2025-06-01T00:00:00Z", // [옵션] 생성일 시작
+    "createdBefore": "2025-06-30T23:59:59Z", // [옵션] 생성일 종료
+    "hasHists": true, // [옵션] 추첨 이력 존재 여부
+    "hasResults": true, // [옵션] 결과 발표 존재 여부
+    "orderBy": "createdAt_desc", // [옵션] 정렬 기준, 기본값: createdAt_desc
+    "page": 1, // [옵션] 페이지 번호, 기본값: 1
+    "pageSize": 20 // [옵션] 페이지당 항목 수, 기본값: 20
+  }
+  ```
+
+- **응답**: 200 OK
+  ```json
+  {
+    "list": [
+      {
+        "id": "550e8400-e29b-41d4-a716-446655440000", // [필수] 추첨 ID
+        "name": "6월 뮤지컬 '마틸다' 추첨", // [필수] 추첨명
+        "allowsDuplicateEntry": false, // [필수] 중복 참여 허용 여부
+        "prizes": [
+          // [필수] 상품 목록
+          {
+            "prizeName": "S석", // [필수] 상품명
+            "winnerCount": 20 // [필수] 당첨자 수
+          },
+          {
+            "prizeName": "A석",
+            "winnerCount": 30
+          }
+        ],
+        "retentionDays": 90, // [필수] 보유 기간(일)
+        "openStartAt": "2025-06-01T00:00:00Z", // [필수] 응모 시작일
+        "openEndAt": "2025-06-15T23:59:59Z", // [필수] 응모 종료일
+        "_count": {
+          // [필수] 관련 데이터 수
+          "hists": 2, // [필수] 추첨 이력 수
+          "results": 1 // [필수] 결과 발표 수
+        },
+        "lastHist": {
+          // [옵션] 마지막 추첨 이력
+          "id": 123, // [필수] 이력 ID
+          "totalCandidates": 1250, // [필수] 총 후보자 수
+          "totalWinners": 50, // [필수] 총 당첨자 수
+          "createdAt": "2025-06-01T10:00:00Z" // [필수] 추첨 실행일
+        },
+        "createdAt": "2025-05-01T09:00:00Z", // [필수] 생성일시
+        "updatedAt": "2025-06-01T10:00:00Z" // [필수] 수정일시
+      }
+    ],
+    "page": 1,
+    "pageSize": 20,
+    "pageCount": 1,
+    "totalCount": 1
+  }
+  ```
+
+### 추첨 상세 조회
+
+- **파라미터**:
+  - `id`: 추첨 ID [필수]
+
+- **응답**:
+  ```json
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440000",
+    "name": "6월 뮤지컬 '마틸다' 추첨",
+    "allowsDuplicateEntry": false,
+    "prizes": [
+      {
+        "prizeName": "S석",
+        "winnerCount": 20
+      },
+      {
+        "prizeName": "A석",
+        "winnerCount": 30
+      }
+    ],
+    "retentionDays": 90,
+    "openStartAt": "2025-06-01T00:00:00Z",
+    "openEndAt": "2025-06-15T23:59:59Z",
+    "_count": {
+      "hists": 2,
+      "results": 1
+    },
+    "hists": [
+      // [필수] 추첨 이력 목록
+      {
+        "id": 124,
+        "totalCandidates": 1250,
+        "totalWinners": 50,
+        "excludedCount": 5,
+        "prizes": [
+          {
+            "prizeName": "S석",
+            "winnerCount": 20
+          },
+          {
+            "prizeName": "A석",
+            "winnerCount": 30
+          }
+        ],
+        "note": "6월 정기 추첨", // [옵션] 추첨 실행 시 메모
+        "admin": {
+          "id": "admin-123",
+          "email": "admin@lg.com",
+          "name": "관리자"
+        },
+        "createdAt": "2025-06-01T10:00:00Z"
+      }
+    ],
+    "results": [
+      // [필수] 결과 발표 목록
+      {
+        "id": "result-123",
+        "title": "6월 뮤지컬 당첨자 발표",
+        "isActive": true,
+        "displayStartAt": "2025-06-02T00:00:00Z",
+        "displayEndAt": "2025-06-30T23:59:59Z",
+        "createdAt": "2025-06-01T11:00:00Z"
+      }
+    ],
+    "createdAt": "2025-05-01T09:00:00Z",
+    "updatedAt": "2025-06-01T10:00:00Z"
+  }
+  ```
+
+### 추첨 생성
+
+- **요청**:
+
+  ```json
+  {
+    // 필수 필드
+    "name": "7월 LG 스타일러 추첨", // [필수] 추첨명
+    "prizes": [
+      // [필수] 상품 목록 (상품명 중복 불가)
+      {
+        "prizeName": "LG 스타일러", // [필수] 상품명
+        "winnerCount": 5 // [필수] 당첨자 수
+      }
+    ],
+    "openStartAt": "2025-07-01T00:00:00Z", // [필수] 응모 시작일
+    "openEndAt": "2025-07-15T23:59:59Z", // [필수] 응모 종료일
+
+    // 옵션 필드
+    "allowsDuplicateEntry": false, // [옵션] 중복 참여 허용, 기본값: false
+    "retentionDays": 90 // [옵션] 보유 기간(일), 기본값: 90
+  }
+  ```
+
+- **응답**: 200 OK (본문 없음)
+
+### 추첨 수정
+
+- **요청**:
+
+  ```json
+  {
+    // 필수 필드
+    "id": "550e8400-e29b-41d4-a716-446655440000", // [필수] 추첨 ID
+
+    // 옵션 필드 (하나 이상 필요)
+    "name": "7월 LG 스타일러 특별 추첨", // [옵션] 추첨명
+    "allowsDuplicateEntry": true, // [옵션] 중복 참여 허용
+    "prizes": [
+      // [옵션] 상품 목록 (상품명 중복 불가)
+      {
+        "prizeName": "LG 스타일러",
+        "winnerCount": 10 // 당첨자 수 증가
+      }
+    ],
+    "openStartAt": "2025-07-01T00:00:00Z", // [옵션] 응모 시작일
+    "openEndAt": "2025-07-20T23:59:59Z", // [옵션] 응모 종료일
+    "retentionDays": 180 // [옵션] 보유 기간 연장
+  }
+  ```
+
+- **응답**: 200 OK (본문 없음)
+
+### 추첨 삭제
+
+- **요청**:
+
+  ```json
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440000" // [필수] 삭제할 추첨 ID
+  }
+  ```
+
+- **응답**: 200 OK (본문 없음)
+- **에러**: 409 CONFLICT - 결과 발표가 있는 경우 삭제 불가
+
+### 추첨 실행
+
+- **요청**:
+
+  ```json
+  {
+    "lotteryId": "550e8400-e29b-41d4-a716-446655440000", // [필수] 추첨 ID
+    "participants": [
+      // [필수] 참여자 목록
+      {
+        "memNo": "1234567890", // [필수] 회원번호
+        "memName": "홍길동", // [옵션] 회원명
+        "phoneNumber": "01012345678" // [옵션] 전화번호
+      }
+      // ... 더 많은 참여자
+    ],
+    "prizes": [
+      // [필수] 추첨할 경품 하위셋 (상품명 중복 불가)
+      {
+        "prizeName": "S석", // [필수] 상품명
+        "winnerCount": 20 // [필수] 당첨자 수
+      }
+    ],
+    "note": "6월 정기 추첨 실행" // [옵션] 메모
+  }
+  ```
+
+- **응답**:
+  ```json
+  {
+    "histId": 125, // [필수] 생성된 추첨 이력 ID
+    "totalCandidates": 1500, // [필수] 총 후보자 수
+    "totalWinners": 50, // [필수] 총 당첨자 수
+    "excludedCount": 10, // [필수] 제외된 인원 수 (블랙리스트)
+    "prizeResults": [
+      // [필수] 상품별 당첨 결과
+      {
+        "prizeName": "S석",
+        "winnerCount": 20
+      },
+      {
+        "prizeName": "A석",
+        "winnerCount": 30
+      }
+    ],
+    "winners": [
+      // [필수] 당첨자 목록
+      {
+        "memNo": "1234567890",
+        "memName": "홍길동",
+        "phoneNumber": "01012345678",
+        "prizeName": "S석"
+      }
+      // ... 더 많은 당첨자
+    ]
+  }
+  ```
+
+### 2. 추첨 이력 참여자(LotteryHistParticipant) 관리
+
+| 메소드 | 엔드포인트                                  | 설명                      | 인증 |
+| ------ | ------------------------------------------- | ------------------------- | ---- |
+| POST   | `/external/admin/lottery/hist/participants` | 추첨 이력 참여자 목록 조회 | 필요 |
+
+### 추첨 이력 참여자 목록 조회
+
+- **요청**:
+
+  ```json
+  {
+    // 필수 필드 중 하나
+    "lotteryId": "550e8400-e29b-41d4-a716-446655440000", // [조건부 필수] 추첨 ID
+    "lotteryHistId": 124, // [조건부 필수] 추첨 이력 ID
+
+    // 옵션 필드
+    "memNo": "1234", // [옵션] 회원번호 검색
+    "memName": "홍", // [옵션] 회원명 검색
+    "phoneNumber": "01012345678", // [옵션] 전화번호 검색
+    "isWinner": true, // [옵션] 당첨 여부
+    "prizeName": "S석", // [옵션] 당첨 상품명
+    "orderBy": "createdAt_desc", // [옵션] 정렬 기준
+    "page": 1, // [옵션] 페이지 번호
+    "pageSize": 20, // [옵션] 페이지당 항목 수
+    "shouldMask": true // [옵션] 개인정보 마스킹, 기본값: true
+  }
+  ```
+
+- **응답**:
+  ```json
+  {
+    "list": [
+      {
+        "id": 123, // [필수] 참여자 ID
+        "memNo": "12****890", // [필수] 회원번호 (마스킹)
+        "memName": "홍*동", // [옵션] 회원명 (마스킹)
+        "phoneNumber": "010****5678", // [옵션] 전화번호 (마스킹)
+        "isWinner": true, // [필수] 당첨 여부
+        "isBanned": false, // [필수] 블랙리스트 여부
+        "prizeName": "S석", // [옵션] 당첨 상품명
+        "lotteryHistId": 124, // [필수] 추첨 이력 ID
+        "createdAt": "2025-06-01T10:00:00Z" // [필수] 참여일시
+      }
+    ],
+    "page": 1,
+    "pageSize": 20,
+    "pageCount": 5,
+    "totalCount": 100
+  }
+  ```
+
+### 3. 추첨 이력(LotteryHist) 관리
+
+| 메소드 | 엔드포인트                         | 설명                | 인증 |
+| ------ | ---------------------------------- | ------------------- | ---- |
+| POST   | `/external/admin/lottery/hists`    | 추첨 이력 목록 조회 | 필요 |
+| GET    | `/external/admin/lottery/hist/get` | 추첨 이력 상세 조회 | 필요 |
+
+### 추첨 이력 목록 조회
+
+- **요청**:
+
+  ```json
+  {
+    // 모두 옵션 필드
+    "lotteryId": "550e8400-e29b-41d4-a716-446655440000", // [옵션] 추첨 ID
+    "adminId": "admin-123", // [옵션] 실행 관리자 ID
+    "createdAfter": "2025-06-01T00:00:00Z", // [옵션] 생성일 시작
+    "createdBefore": "2025-06-30T23:59:59Z", // [옵션] 생성일 종료
+    "orderBy": "createdAt_desc", // [옵션] 정렬 기준
+    "page": 1, // [옵션] 페이지 번호
+    "pageSize": 20 // [옵션] 페이지당 항목 수
+  }
+  ```
+
+- **응답**:
+  ```json
+  {
+    "list": [
+      {
+        "id": 124,
+        "totalCandidates": 1500,
+        "totalWinners": 50,
+        "excludedCount": 10,
+        "prizes": [
+          {
+            "prizeName": "S석",
+            "winnerCount": 20
+          },
+          {
+            "prizeName": "A석",
+            "winnerCount": 30
+          }
+        ],
+        "note": "6월 1차 추첨",
+        "lottery": {
+          "id": "550e8400-e29b-41d4-a716-446655440000",
+          "name": "6월 뮤지컬 '마틸다' 추첨"
+        },
+        "admin": {
+          "id": "admin-123",
+          "email": "admin@lg.com",
+          "name": "관리자"
+        },
+        "createdAt": "2025-06-01T10:00:00Z"
+      }
+    ],
+    "page": 1,
+    "pageSize": 20,
+    "pageCount": 1,
+    "totalCount": 2
+  }
+  ```
+
+### 추첨 이력 상세 조회
+
+- **파라미터**:
+  - `id`: 추첨 이력 ID [필수]
+
+- **응답**:
+  ```json
+  {
+    "id": 124,
+    "totalCandidates": 1500,
+    "totalWinners": 50,
+    "excludedCount": 10,
+    "prizes": [
+      {
+        "prizeName": "S석",
+        "winnerCount": 20
+      },
+      {
+        "prizeName": "A석",
+        "winnerCount": 30
+      }
+    ],
+    "note": "6월 1차 추첨",
+    "lottery": {
+      "id": "550e8400-e29b-41d4-a716-446655440000",
+      "name": "6월 뮤지컬 '마틸다' 추첨"
+    },
+    "admin": {
+      "id": "admin-123",
+      "email": "admin@lg.com",
+      "name": "관리자"
+    },
+    "createdAt": "2025-06-01T10:00:00Z"
+  }
+  ```
+
+### 4. 추첨 결과(LotteryResult) 관리
+
+| 메소드 | 엔드포인트                              | 설명           | 인증 |
+| ------ | --------------------------------------- | -------------- | ---- |
+| POST   | `/external/admin/lottery/results`       | 결과 목록 조회 | 필요 |
+| GET    | `/external/admin/lottery/result/get`    | 결과 상세 조회 | 필요 |
+| POST   | `/external/admin/lottery/result/create` | 결과 생성      | 필요 |
+| POST   | `/external/admin/lottery/result/update` | 결과 수정      | 필요 |
+| POST   | `/external/admin/lottery/result/delete` | 결과 삭제      | 필요 |
+
+### 결과 목록 조회
+
+- **요청**:
+
+  ```json
+  {
+    // 모두 옵션 필드
+    "search": "6월 뮤지컬", // [옵션] 검색어 (제목)
+    "lotteryId": "550e8400-e29b-41d4-a716-446655440000", // [옵션] 추첨 ID
+    "createdAfter": "2025-06-01T00:00:00Z", // [옵션] 생성일 시작
+    "createdBefore": "2025-06-30T23:59:59Z", // [옵션] 생성일 종료
+    "hasHists": true, // [옵션] 추첨 이력 연결 여부
+    "isActive": true, // [옵션] 활성화 여부
+    "progressStatus": "IN_PROGRESS", // [옵션] 진행 상태 (UPCOMING/IN_PROGRESS/ENDED)
+    "orderBy": "createdAt_desc", // [옵션] 정렬 기준
+    "page": 1, // [옵션] 페이지 번호
+    "pageSize": 20 // [옵션] 페이지당 항목 수
+  }
+  ```
+
+- **응답**:
+  ```json
+  {
+    "list": [
+      {
+        "id": "result-456", // [필수] 결과 ID
+        "title": "6월 뮤지컬 당첨자 발표", // [필수] 결과 제목
+        "isActive": true, // [필수] 활성화 여부
+        "displayStartAt": "2025-06-02T00:00:00Z", // [옵션] 노출 시작일
+        "displayEndAt": "2025-06-30T23:59:59Z", // [옵션] 노출 종료일
+        "displayStatus": "DISPLAYED", // [필수] 현재 상태 (UPCOMING/DISPLAYED/ENDED)
+        "lotteryId": "550e8400-e29b-41d4-a716-446655440000", // [필수] 추첨 ID
+        "lotteryHistIds": [124, 125], // [필수] 포함된 추첨 이력 ID 배열
+        "adminId": "admin-123", // [옵션] 작성 관리자 ID
+        "createdAt": "2025-06-01T11:00:00Z", // [필수] 생성일시
+        "updatedAt": "2025-06-01T11:00:00Z" // [필수] 수정일시
+      }
+    ],
+    "page": 1,
+    "pageSize": 20,
+    "pageCount": 1,
+    "totalCount": 1
+  }
+  ```
+
+### 결과 생성
+
+- **요청**:
+
+  ```json
+  {
+    // 필수 필드
+    "lotteryId": "550e8400-e29b-41d4-a716-446655440000", // [필수] 추첨 ID
+    "lotteryHistIds": [124, 125], // [필수] 추첨 이력 ID 배열
+    "title": "6월 뮤지컬 당첨자 발표", // [필수] 제목
+    "images": [
+      // [필수] 이미지 URL 배열
+      "https://example.com/lottery-result.jpg"
+    ],
+
+    // 옵션 필드
+    "instructions": "당첨자 확인 후 개별 연락드립니다.", // [옵션] 안내사항
+    "displayStartAt": "2025-06-02T00:00:00Z", // [옵션] 노출 시작일
+    "displayEndAt": "2025-07-31T23:59:59Z", // [옵션] 노출 종료일
+    "isActive": true // [옵션] 활성화 여부, 기본값: false
+  }
+  ```
+
+- **응답**: 200 OK (본문 없음)
+
+### 결과 수정
+
+- **요청**:
+
+  ```json
+  {
+    // 필수 필드
+    "id": "result-456", // [필수] 수정할 결과 ID
+
+    // 옵션 필드 (하나 이상 필요)
+    "title": "7월 LG 스타일러 당첨자 발표 (수정)", // [옵션] 결과 제목
+    "lotteryHistIds": [127, 128], // [옵션] 결과에 포함할 추첨 이력 ID 배열
+    "displayStartAt": "2025-08-01T00:00:00Z", // [옵션] 노출 시작일
+    "displayEndAt": "2025-08-31T23:59:59Z", // [옵션] 노출 종료일
+    "isActive": true // [옵션] 활성화 여부
+  }
+  ```
+
+- **응답**: 200 OK (본문 없음)
+
+### 5. 블랙리스트(LotteryBlacklist) 관리
+
+| 메소드 | 엔드포인트                                 | 설명                 | 인증 |
+| ------ | ------------------------------------------ | -------------------- | ---- |
+| POST   | `/external/admin/lottery/blacklists`       | 블랙리스트 목록 조회 | 필요 |
+| GET    | `/external/admin/lottery/blacklist/get`    | 블랙리스트 상세 조회 | 필요 |
+| POST   | `/external/admin/lottery/blacklist/create` | 블랙리스트 생성      | 필요 |
+| POST   | `/external/admin/lottery/blacklist/update` | 블랙리스트 수정      | 필요 |
+| POST   | `/external/admin/lottery/blacklist/delete` | 블랙리스트 삭제      | 필요 |
+
+### 블랙리스트 생성
+
+- **요청**:
+
+  ```json
+  {
+    // 필수 필드
+    "memNo": "1234567890", // [필수] 회원번호
+
+    // 옵션 필드
+    "memName": "홍길동", // [옵션] 회원명
+    "phoneNumber": "01012345678", // [옵션] 전화번호
+    "reason": "부정 사용으로 인한 제한" // [옵션] 사유
+  }
+  ```
+
+## 엑셀 다운로드
+
+추첨 이력 참여자 목록을 엑셀로 다운로드하려면 기존의 `downloadLinkCreate` API를 사용합니다:
+
+- **요청**:
+  ```json
+  {
+    "kind": "EXCEL_LOTTERY_HIST_PARTICIPANT", // [필수] 다운로드 종류
+    "filters": {
+      // [필수] 필터 조건
+      "lotteryId": "550e8400-e29b-41d4-a716-446655440000", // [조건부 필수]
+      "lotteryHistId": 124, // [조건부 필수]
+      "memNo": "1234567890", // [옵션] 회원번호 검색
+      "memName": "홍길동", // [옵션] 회원명 검색
+      "phoneNumber": "01012345678", // [옵션] 전화번호 검색
+      "isWinner": true, // [옵션] 당첨 여부
+      "prizeName": "S석", // [옵션] 당첨 상품명
+      "orderBy": "createdAt_desc" // [옵션] 정렬 기준, 기본값: createdAt_desc
+    },
+    "reason": "당첨자 명단 확인", // [필수] 다운로드 사유
+    "password": "myPassword123" // [옵션] 엑셀 파일 암호화 비밀번호
+  }
+  ```
+
+또는 직접 ID 배열 지정:
+
+```json
+{
+  "kind": "EXCEL_LOTTERY_HIST_PARTICIPANT",
+  "filters": {
+    "ids": [1, 2, 3], // [필수] 참여자 ID 배열
+    "orderBy": "createdAt_desc" // [옵션] 정렬 기준, 기본값: createdAt_desc
+  },
+  "reason": "선택한 참여자 정보 확인"
+}
+```
+
+### 엑셀 다운로드 기능
+
+- **파일 형식**: XLSX (Excel 2007+)
+- **비밀번호 보호**: 선택적으로 파일 암호화 가능
+- **포함 데이터**:
+  - 회원번호
+  - 회원명
+  - 연락처
+  - 추첨명
+  - 당첨 여부
+  - 상품명
+  - 참여일시
+- **스타일링**: 헤더 행 강조 (굵은 글씨, 회색 배경)
+- **열 너비**: 내용에 맞게 자동 조정
+
+## 주요 개선사항 (최신 업데이트)
+
+### 1. 날짜 필드 재구성
+- `openStartAt`, `openEndAt`: Lottery 모델로 이동
+- LotteryResult에서는 표시 기간만 관리
+- 날짜 필터 표준화: `createdAfter`/`createdBefore`
+
+### 2. 상품명 중복 방지
+- 추첨 생성/수정/실행 시 상품명 중복 검증
+- Set 자료구조를 사용한 고유성 체크
+- 공통 스키마 `lotteryPrizesSchema` 사용
+
+### 3. 트랜잭션 격리 수준 강화
+- Serializable 격리 수준 적용
+- 동시 추첨 실행 시 데이터 무결성 보장
+- 경품 초과 할당 방지
+
+### 4. 쿼리 성능 최적화
+- Promise.all을 사용한 병렬 쿼리
+- IN clause를 사용한 대량 데이터 처리
+- Map 자료구조로 O(1) 중복 체크
+
+### 5. 스키마 네이밍 일관성
+- OutputItemSchema/DetailOutputSchema 패턴
+- ProgressStatusFilter const 사용
+- 일관된 `admin` prefix
+
+## 성능 고려사항
+
+### 대량 참여자 처리
+
+- 참여자 수에 따른 동적 배치 크기 사용:
+  - 100명 미만: 50개씩 배치
+  - 100~1,000명: 100개씩 배치
+  - 1,000~10,000명: 500개씩 배치
+  - 10,000명 이상: 1,000개씩 배치
+- 블랙리스트 검증을 위한 인덱스 최적화
+- 중복 참여 체크를 위한 효율적 알고리즘
+
+### 추첨 실행 최적화
+
+- Fisher-Yates 셔플 알고리즘으로 공정한 무작위 선정
+- 트랜잭션 격리 수준: Serializable (동시 추첨 실행 시 데이터 무결성 보장)
+- 타임아웃: 120초 (2분)
+- 참여자 필터링 최적화:
+  - Map 자료구조를 사용한 O(1) 중복 제거
+  - Promise.all과 IN clause를 사용한 병렬 쿼리
+  - 필터링 순서: 중복 제거 → 블랙리스트/이전 당첨자 동시 조회 → 분류
+
+### 데이터베이스 인덱스
+
+최적화된 쿼리 성능을 위한 인덱스:
+
+- `LotteryHistParticipant`:
+  - `(lotteryHistId)` - 추첨 이력별 조회
+  - `(lotteryHistId, memName)` - 추첨 이력별 회원명 검색
+- `LotteryHist`:
+  - `(lotteryId)` - 추첨별 이력 조회
+  - `(results)` - N:M 관계 조회
+- `LotteryBlacklist`
+  - `(memNo, isActive)` - 활성 블랙리스트 조회
+
+## 추첨 실행 검증 로직
+
+### 1. 입력 데이터 검증 (API 레벨)
+- 추첨 ID: UUID 형식 검증
+- 참여자 배열: 최소 1명 이상 필수
+- 경품 배열: 최소 1개 이상 필수, 상품명 중복 불가
+- 메모: 선택 (최대 500자)
+- 날짜 범위: openEndAt > openStartAt 검증
+
+### 2. 참여자 수 검증
+- 최소: 1명 이상 (NO_PARTICIPANTS 에러)
+- 최대: 30,000명 이하 (TOO_MANY_PARTICIPANTS 에러)
+
+### 3. 추첨 존재 여부 검증
+- 추첨 ID로 조회 시 존재하지 않으면 LOTTERY_NOT_FOUND 에러
+
+### 4. 경품 누적 사용량 검증
+- 각 경품이 전체 경품 풀에 존재하는지 확인 (PRIZE_NOT_FOUND 에러)
+- 이전 실행들의 누적 사용량을 계산하여 남은 수량 확인
+- 현재 요청 수량이 남은 수량을 초과하면 PRIZE_EXCEED_LIMIT 에러
+
+### 5. 참여자 필터링 로직
+처리 순서 (최적화됨):
+1. **중복 제거** (Map 자료구조 사용, allowsDuplicateEntry=false인 경우만)
+2. **병렬 쿼리** (Promise.all + IN clause):
+   - 블랙리스트 조회
+   - 이전 당첨자 조회
+3. **참여자 분류**:
+   - 블랙리스트: isBanned=true로 기록, 추첨에서 제외
+   - 이전 당첨자: 제외 (항상 적용)
+
+### 6. 최종 참여자 수 vs 경품 수 검증
+- 필터링 후 유효한 참여자 수가 총 경품 수보다 적으면 INSUFFICIENT_PARTICIPANTS 에러
+
+### 7. 통계 정보
+- `totalCandidates`: 필터링 후 참여자 수 (이전 당첨자와 중복 제외, 블랙리스트는 포함)
+- `totalWinners`: 실제 당첨자 수
+- `excludedCount`: 블랙리스트로 인해 추첨에서 제외된 참여자 수
+
+## 에러 처리
+
+모든 API는 표준 HTTP 상태 코드와 함께 에러 메시지를 반환합니다:
+
+```json
+{
+  "error": {
+    "message": "추첨을 찾을 수 없습니다",
+    "code": "NOT_FOUND"
+  }
+}
+```
+
+주요 에러 상황:
+
+- 404: 리소스를 찾을 수 없음
+- 409: 중복 데이터 또는 제약 조건 위반
+- 403: 권한 부족 또는 비즈니스 로직 제약
+- 500: 서버 내부 오류

@@ -1,0 +1,156 @@
+---
+title: 'LG 멤버십 API 설계 원칙'
+description: 'LG 멤버십 API 설계 원칙 및 가이드라인'
+icon: 'robot'
+---
+
+## 1. 기본 아키텍처
+
+- **기술 스택**: tRPC + trpc-openapi, PostgreSQL (Prisma ORM), JWT 기반 인증
+- **API 인터페이스**:
+  - tRPC: 타입 안전성이 보장되는 기본 API 인터페이스
+  - REST: trpc-openapi를 통해 기존 tRPC 라우터를 REST API로도 노출
+- **핵심 특징**:
+  - Path parameter를 사용하지 않고 동일한 request body 구조를 tRPC와 REST 모두에서 사용
+  - 오류 처리는 tRPC 오류 형식을 따름
+  - 응답 데이터는 superjson을 통해 직렬화/역직렬화
+
+## 2. API 구조 및 접근 제어
+
+- **라우터 분리**:
+  - externalAppRouter: 앱에서 사용할 API
+  - externalAdminRouter: 어드민 페이지에서 사용할 API
+- **권한 레벨**:
+  - publicProcedure: 인증 없이 접근 가능
+  - protectedProcedure: 인증된 사용자만 접근 가능
+  - adminProtectedProcedure: 관리자/스태프만 접근 가능
+  - memberProtectedProcedure: 일반 회원만 접근 가능
+  - extProtectedProcedure: API 키를 사용하는 외부 서비스용
+- **API 최소화 원칙**:
+  - 목록 조회 API: 기본적으로 제공
+  - 단일 조회 API(`[리소스명]Get`): 특별히 필요한 경우에만 구현
+    - 일반적으로 목록 조회 API에서 충분한 정보를 제공
+    - 추가 상세 정보가 필요하거나 특정 사용자 플로우에 필수적인 경우만 구현
+  - 생성/수정/삭제 API: 데이터 생명주기 관리를 위해 기본적으로 제공
+
+## 3. 명명 규칙 및 패턴
+
+- **기본 패턴**:
+
+  ```
+  [리소스명][동작]: [적절한 procedure]
+      method: 'HTTP 메소드'
+      path: '/external/[admin|app]/[리소스-경로]/[동작]'
+      query|mutation
+
+  ```
+
+- **CRUD 패턴**:
+  - 목록 조회:
+    - 이름: `[리소스명]s`
+    - HTTP 메소드: `GET` (단순 조회) 또는 `POST` (복잡한 필터링)
+    - 경로: `/external/admin/[리소스-경로]s` 또는 `/external/app/[리소스-경로]s`
+    - tRPC 유형: `query` (단순 조회) 또는 `mutation` (복잡한 필터링)
+  - 단일 조회:
+    - 이름: `[리소스명]Get`
+    - HTTP 메소드: `GET`
+    - 경로: `/external/admin/[리소스-경로]/get` 또는 `/external/app/[리소스-경로]/get`
+    - tRPC 유형: `query`
+  - 생성:
+    - 이름: `[리소스명]Create`
+    - HTTP 메소드: `POST`
+    - 경로: `/external/admin/[리소스-경로]/create` 또는 `/external/app/[리소스-경로]/create`
+    - tRPC 유형: `mutation`
+  - 수정:
+    - 이름: `[리소스명]Update`
+    - HTTP 메소드: `POST`
+    - 경로: `/external/admin/[리소스-경로]/update` 또는 `/external/app/[리소스-경로]/update`
+    - tRPC 유형: `mutation`
+  - 삭제:
+    - 이름: `[리소스명]Delete`
+    - HTTP 메소드: `POST`
+    - 경로: `/external/admin/[리소스-경로]/delete` 또는 `/external/app/[리소스-경로]/delete`
+    - tRPC 유형: `mutation`
+    - 특징: 데이터베이스에서 완전히 삭제
+- **필터링 패턴**:
+  - 관리자 API:
+    - 기본 필터: isActive, orderBy, page, pageSize
+    - 상태 기반 필터링: 상태는 const 객체로 정의 (e.g., ProgressStatusFilter)
+    - 배열로 여러 상태를 한번에 필터링 가능 (e.g., operatingStatus: ['UPCOMING', 'IN_PROGRESS'])
+  - 앱 API:
+    - 기본 필터: page, pageSize
+    - 자동 필터: isActive: true (항상 활성화된 항목만 표시)
+    - 현재 표시 기간에 있는 항목만 표시 (displayStartAt, displayEndAt)
+
+## 4. 코드 구현 원칙
+
+- **상수 정의 및 Zod 활용**:
+
+  ```tsx
+  // 상수 정의 - TypeScript enum 대신 const 객체 사용
+  export const MembershipGrade = {
+    AS00: 'AS00', // 다이아몬드 블랙
+    AS01: 'AS01', // 다이아몬드
+    AS02: 'AS02', // 플래티넘
+    AS03: 'AS03', // 골드
+    AS04: 'AS04', // 실버
+    AS05: 'AS05', // 브론즈
+  } as const;
+
+  // Zod 스키마 - const 객체를 z.nativeEnum()에 직접 전달
+  export const restrictionConfigSchema = z.object({
+    minMembershipGrade: z.nativeEnum(MembershipGrade).optional(),
+  });
+
+  // 타입 정의 - const 객체에서 타입 추출
+  export type TMembershipGrade = (typeof MembershipGrade)[keyof typeof MembershipGrade];
+  ```
+
+  **이 패턴의 장점**:
+  - 코드 일관성 및 가독성 향상
+  - 단일 진실 소스(Single Source of Truth) 유지
+  - 리팩토링 용이성
+  - TypeScript enum의 단점(런타임 복잡성, 트리쉐이킹 문제) 회피
+
+- **엔티티 관계 관리**:
+  1. **생성 시 관계 설정**: 하위 엔티티 생성 시 상위 엔티티 ID 필수 지정
+     - 예: 스페이스 생성 시 호스트 ID 필수 지정
+  2. **수정 시 관계 변경**: 필요한 경우 상위 엔티티 변경 가능
+     - 예: 스페이스 수정 시 다른 호스트로 변경 가능
+  3. **상위 엔티티 수정**: 자체 정보만 수정, 하위 엔티티 관계는 별도 API로 관리
+     - 예: 호스트 수정 시 호스트 자체 정보만 수정, 연결된 스페이스는 별도 수정
+  4. **Prisma connect 구문 필수 사용**: 모든 관계 설정 시 직접 ID 대입이 아닌 connect 구문 사용
+     - 올바른 예:
+       ```tsx
+       prisma.reservationSpace.create({ data: { name: '공간명', host: { connect: { id: hostId } } } });
+       ```
+     - 잘못된 예:
+
+       ```tsx
+       prisma.reservationSpace.create({  data: {    name: "공간명",    hostId: hostId // ❌ 직접 ID 대입  }})
+
+       ```
+
+     - connect 구문 사용 시 존재하지 않는 ID 참조 시 P2025 에러 발생으로 명확한 오류 처리 가능
+
+- **데이터 무결성 보호**:
+  1. **삭제 제한**: 연결된 하위 엔티티가 있는 경우 삭제 방지
+     - 데이터베이스 외래 키 제약 조건을 활용한 자동 검증
+     - Prisma P2003 에러 코드(Foreign key constraint failed)를 통해 하위 엔티티 관계 감지
+     - 예: 호스트에 연결된 스페이스가 있을 경우 호스트 삭제 시 P2003 에러 발생, 이를 handlePrismaError에서 포착하여 적절한 오류 메시지 반환
+  2. **참조 유효성 검증**: 관계 설정 시 참조 엔티티 존재 여부 확인
+     - 주요 접근법:
+       - 명시적 선행 검증: API 코드에서 참조 ID가 존재하는지 직접 확인 (findUnique 사용)
+       - Prisma 에러 처리: 데이터베이스 레벨 오류 발생 시 handlePrismaError 함수에서 P2025 에러 처리
+     - 예: 스페이스 생성 시 호스트 ID의 존재 여부를 먼저 확인 후 생성 시도
+  3. **고유성 제약 조건**: 중복 데이터 방지 및 데이터 일관성 유지
+     - 데이터베이스 고유 인덱스를 활용한 중복 검증
+     - Prisma P2002 에러 코드(Unique constraint failed)를 통해 중복 데이터 감지
+     - 예: 동일한 멤버십 번호로 회원 생성 시도 시 P2002 에러 발생, handlePrismaError에서 포착하여 충돌 오류 반환
+
+## 5. 보안 및 감사
+
+- **개인정보 보호**:
+  - `shouldMask` 파라미터(기본값: false) 제공으로 마스킹 여부 제어
+  - 마스킹이 필요한 필드를 자동으로 처리(예: 멤버 ID, 전화번호 등)
+  - 마스킹 처리 해제 시에만 감사 로그 생성
