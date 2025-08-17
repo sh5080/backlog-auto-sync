@@ -56,18 +56,6 @@ LG 멤버십 추첨 시스템은 공정하고 투명한 추첨을 통해 다양�
 
 ## 주요 데이터 타입 및 스키마
 
-### 추첨 결과 상태 필터 (LotteryResultStatusFilter)
-
-```typescript
-export const LotteryResultStatusFilter = {
-  UPCOMING: 'UPCOMING', // 예정
-  OPEN: 'OPEN', // 응모 중
-  CLOSED: 'CLOSED', // 응모 마감
-  DISPLAYED: 'DISPLAYED', // 결과 발표 중
-  ENDED: 'ENDED', // 종료
-} as const;
-```
-
 ### 진행 상태 필터 (ProgressStatusFilter)
 
 ```typescript
@@ -194,6 +182,7 @@ export const LotteryMaskingConfig = {
     "createdBefore": "2025-06-30T23:59:59Z", // [옵션] 생성일 종료
     "hasHists": true, // [옵션] 추첨 이력 존재 여부
     "hasResults": true, // [옵션] 결과 발표 존재 여부
+    "includePrizeSummary": false, // [옵션] 경품 사용 현황 포함 여부, 기본값: false
     "orderBy": "createdAt_desc", // [옵션] 정렬 기준, 기본값: createdAt_desc
     "page": 1, // [옵션] 페이지 번호, 기본값: 1
     "pageSize": 20 // [옵션] 페이지당 항목 수, 기본값: 20
@@ -227,13 +216,23 @@ export const LotteryMaskingConfig = {
           "hists": 2, // [필수] 추첨 이력 수
           "results": 1 // [필수] 결과 발표 수
         },
-        "lastHist": {
-          // [옵션] 마지막 추첨 이력
-          "id": 123, // [필수] 이력 ID
-          "totalCandidates": 1250, // [필수] 총 후보자 수
-          "totalWinners": 50, // [필수] 총 당첨자 수
-          "createdAt": "2025-06-01T10:00:00Z" // [필수] 추첨 실행일
-        },
+        "canExecute": true, // [필수] 추첨 가능 여부
+        "prizeSummary": [ // [옵션] 경품 사용 현황 (includePrizeSummary=true일 때만 포함)
+          {
+            "prizeName": "S석", // [필수] 상품명
+            "totalCount": 20, // [필수] 총 수량
+            "usedCount": 0, // [필수] 사용된 수량
+            "remainingCount": 20, // [필수] 남은 수량
+            "isExhausted": false // [필수] 소진 여부
+          },
+          {
+            "prizeName": "A석",
+            "totalCount": 30,
+            "usedCount": 0,
+            "remainingCount": 30,
+            "isExhausted": false
+          }
+        ],
         "createdAt": "2025-05-01T09:00:00Z", // [필수] 생성일시
         "updatedAt": "2025-06-01T10:00:00Z" // [필수] 수정일시
       }
@@ -429,10 +428,10 @@ export const LotteryMaskingConfig = {
     "winners": [
       // [필수] 당첨자 목록
       {
-        "memNo": "1234567890",
-        "memName": "홍길동",
-        "phoneNumber": "01012345678",
-        "prizeName": "S석"
+        "memNo": "1234567890", // [필수] 회원번호
+        "memName": "홍길동", // [필수] 회원명 (null인 경우 빈 문자열)
+        "phoneNumber": "01012345678", // [필수] 전화번호 (null인 경우 빈 문자열)
+        "prizeName": "S석" // [필수] 당첨 상품명 (null인 경우 빈 문자열)
       }
       // ... 더 많은 당첨자
     ]
@@ -611,9 +610,8 @@ export const LotteryMaskingConfig = {
     "lotteryId": "550e8400-e29b-41d4-a716-446655440000", // [옵션] 추첨 ID
     "createdAfter": "2025-06-01T00:00:00Z", // [옵션] 생성일 시작
     "createdBefore": "2025-06-30T23:59:59Z", // [옵션] 생성일 종료
-    "hasHists": true, // [옵션] 추첨 이력 연결 여부
+    "displayStatusIn": ["IN_PROGRESS"], // [옵션] 노출 상태 필터 배열 (UPCOMING/IN_PROGRESS/ENDED)
     "isActive": true, // [옵션] 활성화 여부
-    "progressStatus": "IN_PROGRESS", // [옵션] 진행 상태 (UPCOMING/IN_PROGRESS/ENDED)
     "orderBy": "createdAt_desc", // [옵션] 정렬 기준
     "page": 1, // [옵션] 페이지 번호
     "pageSize": 20 // [옵션] 페이지당 항목 수
@@ -630,7 +628,7 @@ export const LotteryMaskingConfig = {
         "isActive": true, // [필수] 활성화 여부
         "displayStartAt": "2025-06-02T00:00:00Z", // [옵션] 노출 시작일
         "displayEndAt": "2025-06-30T23:59:59Z", // [옵션] 노출 종료일
-        "displayStatus": "DISPLAYED", // [필수] 현재 상태 (UPCOMING/DISPLAYED/ENDED)
+        "displayStatus": "IN_PROGRESS", // [필수] 현재 노출 상태 (UPCOMING/IN_PROGRESS/ENDED)
         "lotteryId": "550e8400-e29b-41d4-a716-446655440000", // [필수] 추첨 ID
         "lotteryHistIds": [124, 125], // [필수] 포함된 추첨 이력 ID 배열
         "adminId": "admin-123", // [옵션] 작성 관리자 ID
@@ -681,6 +679,10 @@ export const LotteryMaskingConfig = {
 
     // 옵션 필드 (하나 이상 필요)
     "title": "7월 LG 스타일러 당첨자 발표 (수정)", // [옵션] 결과 제목
+    "images": [ // [옵션] 이미지 URL 배열
+      "https://example.com/lottery-result-updated.jpg"
+    ],
+    "instructions": "당첨자 확인 후 개별 연락드립니다.", // [옵션] 안내사항
     "lotteryHistIds": [127, 128], // [옵션] 결과에 포함할 추첨 이력 ID 배열
     "displayStartAt": "2025-08-01T00:00:00Z", // [옵션] 노출 시작일
     "displayEndAt": "2025-08-31T23:59:59Z", // [옵션] 노출 종료일
