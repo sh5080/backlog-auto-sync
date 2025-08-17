@@ -13,12 +13,12 @@
         "tab": "Guides",
         "groups": [
           {
-            "group": "Architecture",
-            "pages": ["guides/emapp-system", "guides/emapp-api-guidelines", "guides/lottery-erd"]
+            "group": "LG전자 멤버십",
+            "pages": ["guides/emapp-system", "guides/emapp-api-guidelines"]
           },
           {
-            "group": "API Reference",
-            "pages": ["guides/lottery-api-reference"]
+            "group": "추첨 시스템",
+            "pages": ["lottery-system/lottery-erd", "lottery-system/lottery-api-reference"]
           }
         ]
       }
