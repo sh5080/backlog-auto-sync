@@ -83,8 +83,8 @@ export const LotteryOrderBy = {
 export const LotteryHistOrderBy = {
   createdAt_asc: 'createdAt_asc',
   createdAt_desc: 'createdAt_desc',
-  totalCandidates_asc: 'totalCandidates_asc',
-  totalCandidates_desc: 'totalCandidates_desc',
+  totalEntries_asc: 'totalEntries_asc',
+  totalEntries_desc: 'totalEntries_desc',
   totalWinners_asc: 'totalWinners_asc',
   totalWinners_desc: 'totalWinners_desc',
 } as const;
@@ -253,7 +253,6 @@ export const LotteryMaskingConfig = {
   {
     "id": "550e8400-e29b-41d4-a716-446655440000",
     "name": "6월 뮤지컬 '마틸다' 추첨",
-    "allowsDuplicateEntry": false,
     "prizes": [
       {
         "prizeName": "S석",
@@ -275,9 +274,10 @@ export const LotteryMaskingConfig = {
       // [필수] 추첨 이력 목록
       {
         "id": 124,
-        "totalCandidates": 1250,
+        "totalEntries": 1250,
         "totalWinners": 50,
         "excludedCount": 5,
+        "allowsDuplicateEntry": false,
         "prizes": [
           {
             "prizeName": "S석",
@@ -409,9 +409,9 @@ export const LotteryMaskingConfig = {
   ```json
   {
     "histId": 125, // [필수] 생성된 추첨 이력 ID
-    "totalCandidates": 1500, // [필수] 총 후보자 수
+    "totalEntries": 1500, // [필수] 총 참여 횟수
     "totalWinners": 50, // [필수] 총 당첨자 수
-    "excludedCount": 10, // [필수] 제외된 인원 수 (블랙리스트)
+    "excludedCount": 10, // [필수] 제외된 참여 횟수 (블랙리스트와 이전 당첨자)
     "prizeResults": [
       // [필수] 상품별 당첨 결과
       {
@@ -448,15 +448,14 @@ export const LotteryMaskingConfig = {
 
   ```json
   {
-    // 필수 필드 중 하나
-    "lotteryId": "550e8400-e29b-41d4-a716-446655440000", // [조건부 필수] 추첨 ID
-    "lotteryHistId": 124, // [조건부 필수] 추첨 이력 ID
+    // 필수 필드
+    "lotteryHistId": 124, // [필수] 추첨 이력 ID
 
     // 옵션 필드
     "memNo": "1234", // [옵션] 회원번호 검색
     "memName": "홍", // [옵션] 회원명 검색
     "phoneNumber": "01012345678", // [옵션] 전화번호 검색
-    "isWinner": true, // [옵션] 당첨 여부
+    "status": "WINNER", // [옵션] 참여자 상태 (WINNER/NOT_WINNER/EXCLUDED_PREV_WINNER/EXCLUDED_BLACKLIST)
     "prizeName": "S석", // [옵션] 당첨 상품명
     "orderBy": "createdAt_desc", // [옵션] 정렬 기준
     "page": 1, // [옵션] 페이지 번호
@@ -474,8 +473,8 @@ export const LotteryMaskingConfig = {
         "memNo": "12****890", // [필수] 회원번호 (마스킹)
         "memName": "홍*동", // [옵션] 회원명 (마스킹)
         "phoneNumber": "010****5678", // [옵션] 전화번호 (마스킹)
-        "isWinner": true, // [필수] 당첨 여부
-        "isBanned": false, // [필수] 블랙리스트 여부
+        "status": "WINNER", // [필수] 참여자 상태 (WINNER/NOT_WINNER/EXCLUDED_PREV_WINNER/EXCLUDED_BLACKLIST)
+        "entryCount": 1, // [필수] 참여 횟수
         "prizeName": "S석", // [옵션] 당첨 상품명
         "lotteryHistId": 124, // [필수] 추첨 이력 ID
         "createdAt": "2025-06-01T10:00:00Z" // [필수] 참여일시
@@ -518,9 +517,10 @@ export const LotteryMaskingConfig = {
     "list": [
       {
         "id": 124,
-        "totalCandidates": 1500,
+        "totalEntries": 1500,
         "totalWinners": 50,
         "excludedCount": 10,
+        "allowsDuplicateEntry": false,
         "prizes": [
           {
             "prizeName": "S석",
@@ -560,9 +560,10 @@ export const LotteryMaskingConfig = {
   ```json
   {
     "id": 124,
-    "totalCandidates": 1500,
+    "totalEntries": 1500,
     "totalWinners": 50,
     "excludedCount": 10,
+    "allowsDuplicateEntry": false,
     "prizes": [
       {
         "prizeName": "S석",
@@ -726,12 +727,11 @@ export const LotteryMaskingConfig = {
     "kind": "EXCEL_LOTTERY_HIST_PARTICIPANT", // [필수] 다운로드 종류
     "filters": {
       // [필수] 필터 조건
-      "lotteryId": "550e8400-e29b-41d4-a716-446655440000", // [조건부 필수]
-      "lotteryHistId": 124, // [조건부 필수]
+      "lotteryHistId": 124, // [필수]
       "memNo": "1234567890", // [옵션] 회원번호 검색
       "memName": "홍길동", // [옵션] 회원명 검색
       "phoneNumber": "01012345678", // [옵션] 전화번호 검색
-      "isWinner": true, // [옵션] 당첨 여부
+      "status": "WINNER", // [옵션] 참여자 상태
       "prizeName": "S석", // [옵션] 당첨 상품명
       "orderBy": "createdAt_desc" // [옵션] 정렬 기준, 기본값: createdAt_desc
     },
@@ -762,7 +762,7 @@ export const LotteryMaskingConfig = {
   - 회원명
   - 연락처
   - 추첨명
-  - 당첨 여부
+  - 참여자 상태
   - 상품명
   - 참여일시
 - **스타일링**: 헤더 행 강조 (굵은 글씨, 회색 배경)
@@ -871,9 +871,9 @@ export const LotteryMaskingConfig = {
 - 필터링 후 유효한 참여자 수가 총 경품 수보다 적으면 INSUFFICIENT_PARTICIPANTS 에러
 
 ### 7. 통계 정보
-- `totalCandidates`: 필터링 후 참여자 수 (이전 당첨자와 중복 제외, 블랙리스트는 포함)
+- `totalEntries`: 전체 참여 횟수 (중복 참여 포함)
 - `totalWinners`: 실제 당첨자 수
-- `excludedCount`: 블랙리스트로 인해 추첨에서 제외된 참여자 수
+- `excludedCount`: 제외된 참여 횟수 (블랙리스트와 이전 당첨자로 인한 제외)
 
 ## 에러 처리
 
