@@ -6,6 +6,39 @@
 - **관리 도구**: backlog.md CLI
 - **목적**: 통합 태스크 매니징 및 프로젝트 관리
 
+## 주요 기능
+
+### 쿠폰 시스템
+- 멤버십 등급별 차별화된 혜택 제공 (VIP, Premium, Basic)
+- 쿠폰 발급/사용 이력 관리 및 통계
+- 유효기간 및 사용 조건 자동 관리
+- 프로모션 연계 쿠폰 발행 및 타겟팅
+- 실시간 쿠폰 상태 추적 및 알림
+
+### 예약 시스템
+- LG 프리미엄 라운지 예약 관리 (강남, 광화문, 부산)
+- LG 아트센터 공연/전시 예약 서비스
+- 실시간 예약 가능 시간 조회 및 자동 배정
+- 예약 변경/취소 및 푸시 알림 기능
+- QR 코드 기반 체크인 지원
+- 노쇼(No-show) 방지 및 패널티 시스템
+
+### 추첨 시스템
+- 공정한 랜덤 추첨 알고리즘 적용 (Mersenne Twister)
+- 이벤트별 당첨 확률 설정 및 가중치 적용
+- 중복 당첨 방지 로직 및 블랙리스트 관리
+- 당첨자 선정 및 자동 알림 발송
+- 추첨 결과 검증 및 감사 로그
+- 실시간 추첨 진행 상황 모니터링
+
+### 메시징 시스템
+- Push, Email, SMS, 카카오톡 멀티채널 통합 발송
+- 대량 메시지 발송 지원 (초당 10만 건 처리)
+- 개인화 메시지 및 템플릿 관리
+- 발송 이력 추적 및 통계 분석
+- 실패 메시지 자동 재발송 및 폴백 처리
+- A/B 테스트 및 발송 최적화
+
 ## 디렉토리 구조
 
 ```
@@ -13,7 +46,10 @@ backlog-lg/                  # 태스크 매니징 루트
 ├── CLAUDE.md               # 이 파일 (프로젝트 가이드)
 ├── projs/                  # 심볼릭 링크로 연결된 실제 프로젝트들
 │   ├── EMAPP-LGE-Repo      → ../../EMAPP-LGE-Repo (메인 애플리케이션)
-│   └── EMAPP-LGE-Admin-Repo → ../../EMAPP-LGE-Admin-Repo (관리자 포털)
+│   ├── EMAPP-LGE-Admin-Repo → ../../EMAPP-LGE-Admin-Repo (관리자 포털)
+│   ├── automata_signal     → ../../automata_signal (멀티채널 메시징 플랫폼)
+│   ├── tf-monorepo         → ../../tf-monorepo (이커머스 플랫폼)
+│   └── harmony-mono        → ../../harmony-mono (하모니 모노레포)
 ├── backlog/                # backlog.md 태스크 관리
 │   ├── config.yml          # 백로그 설정
 │   ├── tasks/              # 활성 태스크
@@ -75,11 +111,42 @@ backlog-lg/                  # 태스크 매니징 루트
 - 관리자 웹 인터페이스
 - 쿠폰, 예약, 추첨 관리
 
-### 주요 기능
+### automata_signal (멀티채널 메시징 플랫폼)
 
-- **쿠폰 시스템**: 멤버십 등급별 혜택 관리
-- **예약 시스템**: 프리미엄 라운지, 아트센터 예약
-- **추첨 시스템**: 공정한 경품 추첨 및 당첨자 관리
+- Elixir + Phoenix LiveView
+- Push, Email, SMS, 카카오톡 통합 메시징 API 서버
+- 초당 10만 건 대량 메시지 처리
+- 멀티테넌시 지원 (프로젝트별 완전한 데이터 격리)
+
+### tf-monorepo/signal (Signal 관리 UI)
+
+- Next.js + React + TypeScript
+- automata_signal의 프론트엔드 관리 인터페이스
+- 메시지 발송, 템플릿 관리, 통계 대시보드
+- Proxy API를 통한 automata_signal SDK Server 연동
+
+### harmony-mono (하모니 모노레포)
+
+- 모노레포 프로젝트
+- 상세 기술 스택 및 기능 (추가 조사 필요)
+
+## 프로젝트 간 관계
+
+### Signal 시스템 아키텍처
+
+**automata_signal**과 **tf-monorepo/signal**은 백엔드-프론트엔드 관계로 통합된 메시징 시스템을 구성합니다:
+
+- **automata_signal (백엔드)**
+
+  - 멀티채널 메시지 발송 엔진 (Push/Email/SMS/카카오톡)
+  - SDK Server API 제공 (API Key 인증)
+  - 실시간 대량 메시지 처리 (초당 10만 건)
+  - 멀티테넌시 및 프로젝트별 데이터 격리
+
+- **tf-monorepo/signal (프론트엔드)**
+  - automata_signal의 웹 관리 인터페이스
+  - 통신 구조: Signal UI → Proxy API (JWT) → SDK Server API (API Key)
+  - 메시지 작성/발송, 템플릿 관리, 통계 대시보드 제공
 
 ## 문서 관리
 
