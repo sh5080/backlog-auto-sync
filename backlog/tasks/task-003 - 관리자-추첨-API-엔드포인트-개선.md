@@ -1,14 +1,14 @@
 ---
 id: task-003
-title: 관리자 추첨 API 엔드포인트 개선 완료
+title: 관리자 추첨 API 엔드포인트 개선
 status: Done
 assignee: ['@seok']
 created_date: '2025-08-17 13:26'
 labels:
-  - lottery
+  - backend
   - api
+  - lottery
   - admin
-  - completed
 dependencies: []
 priority: high
 ---

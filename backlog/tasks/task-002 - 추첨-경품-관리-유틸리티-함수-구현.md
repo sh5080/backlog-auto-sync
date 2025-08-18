@@ -1,13 +1,13 @@
 ---
 id: task-002
-title: 추첨 경품 관리 유틸리티 함수 구현 완료
+title: 추첨 경품 관리 유틸리티 함수 구현
 status: Done
 assignee: ['@seok']
 created_date: '2025-08-17 13:25'
 labels:
+  - backend
   - lottery
   - utility
-  - completed
 dependencies: []
 priority: high
 ---

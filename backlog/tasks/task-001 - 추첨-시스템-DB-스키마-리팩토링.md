@@ -1,13 +1,14 @@
 ---
 id: task-001
-title: 추첨 시스템 DB 스키마 리팩토링 완료
+title: 추첨 시스템 DB 스키마 리팩토링
 status: Done
 assignee: ['@seok']
 created_date: '2025-08-17 13:23'
 labels:
-  - lottery
+  - backend
   - database
-  - completed
+  - lottery
+  - migration
 dependencies: []
 priority: high
 ---

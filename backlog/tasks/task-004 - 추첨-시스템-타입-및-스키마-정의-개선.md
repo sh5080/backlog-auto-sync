@@ -1,14 +1,14 @@
 ---
 id: task-004
-title: 추첨 시스템 타입 및 스키마 정의 개선 완료
+title: 추첨 시스템 타입 및 스키마 정의 개선
 status: Done
 assignee: ['@seok']
 created_date: '2025-08-17 13:27'
 labels:
-  - lottery
+  - backend
   - types
-  - schema
-  - completed
+  - lottery
+  - validation
 dependencies: []
 priority: medium
 ---
