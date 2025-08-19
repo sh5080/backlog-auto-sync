@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@seok'
 created_date: '2025-08-18 03:32'
-updated_date: '2025-08-18 17:30'
+updated_date: '2025-08-19 15:30'
 labels:
   - backend
   - database
@@ -74,6 +74,17 @@ priority: high
   - 마이그레이션 생성 및 적용: `remove-cascade-on-lottery-relations`
   - 이제 추첨에 이력이나 결과가 있으면 DB 레벨에서 삭제 차단
 
+- [x] 추첨 보존 기간 검증 기능 구현
+  - consts-lottery.ts: `LOTTERY_RETENTION_EXPIRED` 에러 코드 및 메시지 추가
+  - utils-lottery.ts: `isRetentionExpired` 함수 추가 (보존 기간 만료 여부 확인)
+  - utils-lottery.ts: `validateLotteryRetention` 함수 추가 (보존 기간 검증 및 에러 발생)
+  - utils-lottery.ts: `canExecuteLottery` 함수 수정 - 보존 기간 만료 시 false 반환
+  - utils-lottery.ts: `executeLottery` 함수 수정 - 추첨 실행 전 보존 기간 검증
+  - externalAdmin-lottery.ts: `lotteryResultCreate` API - 결과 생성 전 보존 기간 검증
+  - externalAdmin-lottery.ts: `lotteries` API - canExecute 계산 시 보존 기간 반영
+  - externalAdmin-lottery.ts: `lotteryGet` API - canExecute 계산 시 보존 기간 반영
+  - 현재 시간이 `openEndAt + retentionDays`를 초과한 경우 추첨 실행 및 결과 저장 차단
+
 ## 주요 개선 효과
 
 1. **성능 최적화**
@@ -93,3 +104,8 @@ priority: high
 4. **개인정보 보호**
    - 자동 데이터 삭제로 GDPR 등 규정 준수
    - 통계 데이터는 유지하면서 개인정보만 삭제
+
+5. **데이터 무결성 강화**
+   - 보존 기간이 만료된 추첨의 실행 및 결과 저장 차단
+   - 추첨 가능 여부(canExecute) 플래그에 보존 기간 반영
+   - 시간 기반 데이터 검증으로 데이터 일관성 보장

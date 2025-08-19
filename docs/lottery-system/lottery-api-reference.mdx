@@ -215,7 +215,7 @@ export const LotteryMaskingConfig = {
           "hists": 2, // [필수] 추첨 이력 수
           "results": 1 // [필수] 결과 발표 수
         },
-        "canExecute": true, // [필수] 추첨 가능 여부
+        "canExecute": true, // [필수] 추첨 가능 여부 (경품 재고 및 보존 기간 고려)
         "prizeSummary": [ // [옵션] 경품 사용 현황 (includePrizeSummary=true일 때만 포함)
           {
             "prizeName": "S석", // [필수] 상품명
@@ -435,6 +435,12 @@ export const LotteryMaskingConfig = {
     ]
   }
   ```
+
+- **에러 응답**:
+  - `400 BAD_REQUEST`: 입력 데이터 검증 실패
+  - `403 FORBIDDEN`: 보존 기간 만료 (`LOTTERY_RETENTION_EXPIRED`)
+    - 에러 메시지: "추첨 보존 기간이 만료되었습니다. (종료일: {openEndAt}, 보존 기간: {retentionDays}일)"
+  - `404 NOT_FOUND`: 추첨을 찾을 수 없음
 
 ### 2. 추첨 이력 참여자(LotteryHistParticipant) 관리
 
@@ -667,6 +673,12 @@ export const LotteryMaskingConfig = {
 
 - **응답**: 200 OK (본문 없음)
 
+- **에러 응답**:
+  - `400 BAD_REQUEST`: 입력 데이터 검증 실패
+  - `403 FORBIDDEN`: 보존 기간 만료 (`LOTTERY_RETENTION_EXPIRED`)
+    - 에러 메시지: "추첨 보존 기간이 만료되었습니다. (종료일: {openEndAt}, 보존 기간: {retentionDays}일)"
+  - `404 NOT_FOUND`: 추첨 또는 추첨 이력을 찾을 수 없음
+
 ### 결과 수정
 
 - **요청**:
@@ -839,19 +851,24 @@ export const LotteryMaskingConfig = {
 - 메모: 선택 (최대 500자)
 - 날짜 범위: openEndAt > openStartAt 검증
 
-### 2. 참여자 수 검증
+### 2. 보존 기간 검증
+- 현재 시간이 `openEndAt + retentionDays`를 초과한 경우 LOTTERY_RETENTION_EXPIRED 에러
+- 추첨 실행 및 결과 생성 시 모두 적용
+- canExecute 플래그 계산 시에도 보존 기간 고려
+
+### 3. 참여자 수 검증
 - 최소: 1명 이상 (NO_PARTICIPANTS 에러)
 - 최대: 30,000명 이하 (TOO_MANY_PARTICIPANTS 에러)
 
-### 3. 추첨 존재 여부 검증
+### 4. 추첨 존재 여부 검증
 - 추첨 ID로 조회 시 존재하지 않으면 LOTTERY_NOT_FOUND 에러
 
-### 4. 경품 누적 사용량 검증
+### 5. 경품 누적 사용량 검증
 - 각 경품이 전체 경품 풀에 존재하는지 확인 (PRIZE_NOT_FOUND 에러)
 - 이전 실행들의 누적 사용량을 계산하여 남은 수량 확인
 - 현재 요청 수량이 남은 수량을 초과하면 PRIZE_EXCEED_LIMIT 에러
 
-### 5. 참여자 필터링 로직
+### 6. 참여자 필터링 로직
 처리 순서 (최적화됨):
 1. **중복 제거** (Map 자료구조 사용, allowsDuplicateEntry=false인 경우만)
    - 이제 LotteryHist별로 설정 (추첨 실행별로 다르게 적용 가능)
@@ -865,12 +882,12 @@ export const LotteryMaskingConfig = {
    - allowsDuplicateEntry=true여도 한 회원은 한 번만 당첨
    - 중복 참여는 당첨 확률을 높이지만, 실제 당첨은 1회로 제한
 
-### 6. 최종 참여자 수 vs 경품 수 검증
+### 7. 최종 참여자 수 vs 경품 수 검증
 - allowsDuplicateEntry=true인 경우: 고유 회원 수로 검증
 - allowsDuplicateEntry=false인 경우: 전체 참여자 수로 검증
 - 필터링 후 유효한 참여자 수가 총 경품 수보다 적으면 INSUFFICIENT_PARTICIPANTS 에러
 
-### 7. 통계 정보
+### 8. 통계 정보
 - `totalEntries`: 전체 참여 횟수 (중복 참여 포함)
 - `totalWinners`: 실제 당첨자 수
 - `excludedCount`: 제외된 참여 횟수 (블랙리스트와 이전 당첨자로 인한 제외)
@@ -890,7 +907,12 @@ export const LotteryMaskingConfig = {
 
 주요 에러 상황:
 
+- 400: 입력 데이터 검증 실패
+- 403: 권한 부족 또는 비즈니스 로직 제약 (보존 기간 만료 포함)
 - 404: 리소스를 찾을 수 없음
 - 409: 중복 데이터 또는 제약 조건 위반
-- 403: 권한 부족 또는 비즈니스 로직 제약
 - 500: 서버 내부 오류
+
+### 주요 에러 코드
+
+- `FDE-L-203`: LOTTERY_RETENTION_EXPIRED - 추첨 보존 기간 만료
