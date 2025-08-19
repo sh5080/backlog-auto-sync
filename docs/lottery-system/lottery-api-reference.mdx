@@ -142,20 +142,79 @@ export const LotteryMaskingConfig = {
 };
 ```
 
-## 공통 에러 코드
+## 에러 처리
 
-| 코드                      | 설명                               | 대응 방법                       |
-| ------------------------- | ---------------------------------- | ------------------------------- |
-| LOTTERY_NOT_FOUND         | 추첨을 찾을 수 없습니다            | 올바른 추첨 ID 확인             |
-| LOTTERY_RESULT_NOT_FOUND  | 당첨자 발표를 찾을 수 없습니다     | 올바른 발표 ID 확인             |
-| LOTTERY_HIST_NOT_FOUND    | 추첨 이력을 찾을 수 없습니다       | 올바른 이력 ID 확인             |
-| BLACKLIST_NOT_FOUND       | 블랙리스트를 찾을 수 없습니다      | 올바른 블랙리스트 ID 확인       |
-| NO_PARTICIPANTS           | 참여자가 없습니다                  | 참여자 추가 후 재시도           |
-| INSUFFICIENT_PARTICIPANTS | 참여자 수가 당첨자 수보다 적습니다 | 참여자 추가 또는 당첨자 수 조정 |
-| TOO_MANY_PARTICIPANTS     | 참여자 수가 너무 많습니다          | 참여자 수 제한 (3만명)          |
-| PRIZE_NOT_FOUND           | 해당 경품을 찾을 수 없습니다       | 올바른 경품명 확인              |
-| PRIZE_EXCEED_LIMIT        | 경품 당첨자 수가 초과합니다        | 경품 당첨자 수 조정             |
-| DUPLICATE_PRIZE_NAME      | 상품명이 중복되었습니다        | 각 상품명을 고유하게 수정       |
+### 에러 응답 형식
+
+모든 API는 표준 HTTP 상태 코드와 함께 에러 메시지를 반환합니다:
+
+```json
+{
+  "error": {
+    "message": "추첨을 찾을 수 없습니다",
+    "code": "FDE-L-001"
+  }
+}
+```
+
+### HTTP 상태 코드별 분류
+
+| HTTP 상태 | 설명                                   | 예시 상황                       |
+| --------- | -------------------------------------- | ------------------------------- |
+| 400       | 잘못된 요청 - 입력 데이터 검증 실패    | 필수 파라미터 누락, 형식 오류   |
+| 401       | 인증 실패 - JWT 토큰 없음 또는 만료    | 로그인 필요                     |
+| 403       | 권한 부족 또는 비즈니스 로직 제약      | 보존 기간 만료, 권한 없음       |
+| 404       | 리소스를 찾을 수 없음                  | 존재하지 않는 ID                |
+| 409       | 충돌 - 중복 데이터 또는 제약 조건 위반 | 이미 존재하는 데이터, 삭제 불가 |
+| 500       | 서버 내부 오류                         | 예기치 않은 서버 오류           |
+
+### 공통 에러 코드
+
+추첨 시스템의 모든 에러 코드는 `FDE-L-XXX` 형식을 따릅니다 (L: Lottery 도메인).
+
+#### 추첨 관련 (001-099)
+
+| 코드      | 에러명            | HTTP | 설명                    | 대응 방법           |
+| --------- | ----------------- | ---- | ----------------------- | ------------------- |
+| FDE-L-001 | LOTTERY_NOT_FOUND | 404  | 추첨을 찾을 수 없습니다 | 올바른 추첨 ID 확인 |
+
+#### 추첨 이력 관련 (101-199)
+
+| 코드      | 에러명                 | HTTP | 설명                         | 대응 방법           |
+| --------- | ---------------------- | ---- | ---------------------------- | ------------------- |
+| FDE-L-101 | LOTTERY_HIST_NOT_FOUND | 404  | 추첨 이력을 찾을 수 없습니다 | 올바른 이력 ID 확인 |
+
+#### 추첨 결과 관련 (201-299)
+
+| 코드      | 에러명                    | HTTP | 설명                            | 대응 방법                         |
+| --------- | ------------------------- | ---- | ------------------------------- | --------------------------------- |
+| FDE-L-201 | LOTTERY_RESULT_NOT_FOUND  | 404  | 당첨자 발표를 찾을 수 없습니다  | 올바른 발표 ID 확인               |
+| FDE-L-202 | INVALID_DATE_RANGE        | 400  | 잘못된 날짜 범위입니다          | 시작일이 종료일보다 이전인지 확인 |
+| FDE-L-203 | LOTTERY_RETENTION_EXPIRED | 403  | 추첨 보존 기간이 만료되었습니다 | 보존 기간 내에만 추첨 실행 가능   |
+
+#### 블랙리스트 관련 (301-399)
+
+| 코드      | 에러명              | HTTP | 설명                          | 대응 방법                 |
+| --------- | ------------------- | ---- | ----------------------------- | ------------------------- |
+| FDE-L-301 | BLACKLIST_NOT_FOUND | 404  | 블랙리스트를 찾을 수 없습니다 | 올바른 블랙리스트 ID 확인 |
+
+#### 참여자 관련 (401-499)
+
+| 코드      | 에러명                    | HTTP | 설명                               | 대응 방법                       |
+| --------- | ------------------------- | ---- | ---------------------------------- | ------------------------------- |
+| FDE-L-401 | NO_PARTICIPANTS           | 400  | 참여자가 없습니다                  | 참여자 추가 후 재시도           |
+| FDE-L-402 | INSUFFICIENT_PARTICIPANTS | 400  | 참여자 수가 당첨자 수보다 적습니다 | 참여자 추가 또는 당첨자 수 조정 |
+| FDE-L-403 | TOO_MANY_PARTICIPANTS     | 400  | 참여자 수가 너무 많습니다          | 참여자 수 제한 (최대 3만명)     |
+
+#### 경품 관련 (501-599)
+
+| 코드      | 에러명                     | HTTP | 설명                                      | 대응 방법                   |
+| --------- | -------------------------- | ---- | ----------------------------------------- | --------------------------- |
+| FDE-L-501 | PRIZE_NOT_FOUND            | 404  | 해당 경품을 찾을 수 없습니다              | 올바른 경품명 확인          |
+| FDE-L-502 | PRIZE_EXCEED_LIMIT         | 400  | 경품 당첨자 수가 한도를 초과합니다        | 남은 경품 수량 확인 후 조정 |
+| FDE-L-503 | PRIZE_QUANTITY_BELOW_USAGE | 400  | 경품 수량이 이미 사용된 수량보다 적습니다 | 사용 이력 확인 후 수량 증가 |
+| FDE-L-504 | PRIZE_CANNOT_DELETE        | 409  | 이미 사용된 경품은 삭제할 수 없습니다     | 경품 사용 이력 확인         |
+| -         | DUPLICATE_PRIZE_NAME       | 400  | 상품명이 중복되었습니다                   | 각 상품명을 고유하게 수정   |
 
 ## API 엔드포인트
 
@@ -216,7 +275,8 @@ export const LotteryMaskingConfig = {
           "results": 1 // [필수] 결과 발표 수
         },
         "canExecute": true, // [필수] 추첨 가능 여부 (경품 재고 및 보존 기간 고려)
-        "prizeSummary": [ // [옵션] 경품 사용 현황 (includePrizeSummary=true일 때만 포함)
+        "prizeSummary": [
+          // [옵션] 경품 사용 현황 (includePrizeSummary=true일 때만 포함)
           {
             "prizeName": "S석", // [필수] 상품명
             "totalCount": 20, // [필수] 총 수량
@@ -246,6 +306,7 @@ export const LotteryMaskingConfig = {
 ### 추첨 상세 조회
 
 - **파라미터**:
+
   - `id`: 추첨 ID [필수]
 
 - **응답**:
@@ -411,6 +472,7 @@ export const LotteryMaskingConfig = {
   ```
 
 - **응답**:
+
   ```json
   {
     "histId": 125, // [필수] 생성된 추첨 이력 ID
@@ -449,8 +511,8 @@ export const LotteryMaskingConfig = {
 
 ### 2. 추첨 이력 참여자(LotteryHistParticipant) 관리
 
-| 메소드 | 엔드포인트                                  | 설명                      | 인증 |
-| ------ | ------------------------------------------- | ------------------------- | ---- |
+| 메소드 | 엔드포인트                                  | 설명                       | 인증 |
+| ------ | ------------------------------------------- | -------------------------- | ---- |
 | POST   | `/external/admin/lottery/hist/participants` | 추첨 이력 참여자 목록 조회 | 필요 |
 
 ### 추첨 이력 참여자 목록 조회
@@ -500,11 +562,11 @@ export const LotteryMaskingConfig = {
 
 ### 3. 추첨 이력(LotteryHist) 관리
 
-| 메소드 | 엔드포인트                              | 설명                    | 인증 |
-| ------ | --------------------------------------- | ----------------------- | ---- |
-| POST   | `/external/admin/lottery/hists`         | 추첨 이력 목록 조회      | 필요 |
-| GET    | `/external/admin/lottery/hist/get`      | 추첨 이력 상세 조회      | 필요 |
-| POST   | `/external/admin/lottery/hist/update-note` | 추첨 이력 메모 수정    | 필요 |
+| 메소드 | 엔드포인트                                 | 설명                | 인증 |
+| ------ | ------------------------------------------ | ------------------- | ---- |
+| POST   | `/external/admin/lottery/hists`            | 추첨 이력 목록 조회 | 필요 |
+| GET    | `/external/admin/lottery/hist/get`         | 추첨 이력 상세 조회 | 필요 |
+| POST   | `/external/admin/lottery/hist/update-note` | 추첨 이력 메모 수정 | 필요 |
 
 ### 추첨 이력 목록 조회
 
@@ -570,6 +632,7 @@ export const LotteryMaskingConfig = {
 ### 추첨 이력 상세 조회
 
 - **파라미터**:
+
   - `id`: 추첨 이력 ID [필수]
 
 - **응답**:
@@ -607,6 +670,7 @@ export const LotteryMaskingConfig = {
 ### 추첨 이력 메모 수정
 
 - **요청**:
+
   ```json
   {
     "id": 124, // [필수] 추첨 이력 ID
@@ -715,7 +779,8 @@ export const LotteryMaskingConfig = {
 
     // 옵션 필드 (하나 이상 필요)
     "title": "7월 LG 스타일러 당첨자 발표 (수정)", // [옵션] 결과 제목
-    "images": [ // [옵션] 이미지 URL 배열
+    "images": [
+      // [옵션] 이미지 URL 배열
       "https://example.com/lottery-result-updated.jpg"
     ],
     "instructions": "당첨자 확인 후 개별 연락드립니다.", // [옵션] 안내사항
@@ -727,6 +792,32 @@ export const LotteryMaskingConfig = {
   ```
 
 - **응답**: 200 OK (본문 없음)
+
+### 5. 블랙리스트(LotteryBlacklist) 관리
+
+| 메소드 | 엔드포인트                                 | 설명                 | 인증 |
+| ------ | ------------------------------------------ | -------------------- | ---- |
+| POST   | `/external/admin/lottery/blacklists`       | 블랙리스트 목록 조회 | 필요 |
+| GET    | `/external/admin/lottery/blacklist/get`    | 블랙리스트 상세 조회 | 필요 |
+| POST   | `/external/admin/lottery/blacklist/create` | 블랙리스트 생성      | 필요 |
+| POST   | `/external/admin/lottery/blacklist/update` | 블랙리스트 수정      | 필요 |
+| POST   | `/external/admin/lottery/blacklist/delete` | 블랙리스트 삭제      | 필요 |
+
+### 블랙리스트 생성
+
+- **요청**:
+
+  ```json
+  {
+    // 필수 필드
+    "memNo": "1234567890", // [필수] 회원번호
+
+    // 옵션 필드
+    "memName": "홍길동", // [옵션] 회원명
+    "phoneNumber": "01012345678", // [옵션] 전화번호
+    "reason": "부정 사용으로 인한 제한" // [옵션] 사유
+  }
+  ```
 
 ## 앱 API 엔드포인트
 
@@ -740,9 +831,9 @@ export const LotteryMaskingConfig = {
 
 ### 앱 API 엔드포인트
 
-| 메소드 | 엔드포인트                          | 설명                           | 인증   |
-| ------ | ----------------------------------- | ------------------------------ | ------ |
-| POST   | `/external/app/lottery/results`    | 추첨 결과 목록 조회            | 불필요 |
+| 메소드 | 엔드포인트                         | 설명                              | 인증   |
+| ------ | ---------------------------------- | --------------------------------- | ------ |
+| POST   | `/external/app/lottery/results`    | 추첨 결과 목록 조회               | 불필요 |
 | GET    | `/external/app/lottery/result/get` | 추첨 결과 상세 조회 (당첨자 포함) | 불필요 |
 
 ### 추첨 결과 목록 조회 (앱)
@@ -750,6 +841,7 @@ export const LotteryMaskingConfig = {
 현재 진행 중인 추첨 결과 목록을 반환합니다.
 
 - **요청**:
+
   ```json
   {
     "page": 1, // [옵션] 페이지 번호, 기본값: 1
@@ -785,6 +877,7 @@ export const LotteryMaskingConfig = {
 추첨 결과 상세 정보와 경품별 당첨자 목록을 반환합니다. 당첨자 개인정보는 마스킹 처리됩니다.
 
 - **파라미터**:
+
   - `id`: 추첨 결과 ID [필수]
 
 - **응답**:
@@ -792,7 +885,8 @@ export const LotteryMaskingConfig = {
   {
     "id": "550e8400-e29b-41d4-a716-446655440000", // [필수] 결과 ID
     "title": "6월 뮤지컬 당첨자 발표", // [필수] 제목
-    "images": [ // [필수] 이미지 URL 배열
+    "images": [
+      // [필수] 이미지 URL 배열
       "https://example.com/lottery-result.jpg"
     ],
     "instructions": "당첨자 확인 후 개별 연락드립니다.", // [옵션] 안내사항
@@ -804,11 +898,13 @@ export const LotteryMaskingConfig = {
       "openStartAt": "2025-06-01T00:00:00Z", // [필수] 응모 시작일
       "openEndAt": "2025-06-15T23:59:59Z" // [필수] 응모 종료일
     },
-    "prizeWinners": [ // [필수] 경품별 당첨자 정보
+    "prizeWinners": [
+      // [필수] 경품별 당첨자 정보
       {
         "prizeName": "S석", // [필수] 경품명
         "winnerCount": 20, // [필수] 당첨자 수
-        "winners": [ // [필수] 당첨자 목록 (마스킹 처리)
+        "winners": [
+          // [필수] 당첨자 목록 (마스킹 처리)
           {
             "memNo": "12****", // [필수] 회원번호 (마스킹)
             "memName": "홍*동", // [옵션] 회원명 (마스킹)
@@ -832,38 +928,12 @@ export const LotteryMaskingConfig = {
 
 1. **인증 불필요**: 모든 앱 API는 인증 없이 접근 가능
 2. **자동 마스킹**: 개인정보는 LotteryMaskingConfig에 따라 자동 마스킹
-   - 이름: 첫글자와 마지막글자만 표시 (예: "홍*동")
-   - 회원번호: 앞 2자리만 표시 (예: "12****")
-   - 전화번호: 앞 5자리와 뒤 4자리만 표시 (예: "010****5678")
+   - 이름: 첫글자와 마지막글자만 표시 (예: "홍\*동")
+   - 회원번호: 앞 2자리만 표시 (예: "12\*\*\*\*")
+   - 전화번호: 앞 5자리와 뒤 4자리만 표시 (예: "010\*\*\*\*5678")
 3. **진행 중 필터링**: 목록 조회 시 createProgressStatusFilter를 사용하여 현재 진행 중인 결과만 표시
 4. **경품별 그룹화**: 당첨자 정보를 경품별로 그룹화하여 제공
 5. **정렬**: 기본적으로 displayStartAt 내림차순 정렬
-
-### 5. 블랙리스트(LotteryBlacklist) 관리
-
-| 메소드 | 엔드포인트                                 | 설명                 | 인증 |
-| ------ | ------------------------------------------ | -------------------- | ---- |
-| POST   | `/external/admin/lottery/blacklists`       | 블랙리스트 목록 조회 | 필요 |
-| GET    | `/external/admin/lottery/blacklist/get`    | 블랙리스트 상세 조회 | 필요 |
-| POST   | `/external/admin/lottery/blacklist/create` | 블랙리스트 생성      | 필요 |
-| POST   | `/external/admin/lottery/blacklist/update` | 블랙리스트 수정      | 필요 |
-| POST   | `/external/admin/lottery/blacklist/delete` | 블랙리스트 삭제      | 필요 |
-
-### 블랙리스트 생성
-
-- **요청**:
-
-  ```json
-  {
-    // 필수 필드
-    "memNo": "1234567890", // [필수] 회원번호
-
-    // 옵션 필드
-    "memName": "홍길동", // [옵션] 회원명
-    "phoneNumber": "01012345678", // [옵션] 전화번호
-    "reason": "부정 사용으로 인한 제한" // [옵션] 사유
-  }
-  ```
 
 ## 엑셀 다운로드
 
@@ -916,43 +986,6 @@ export const LotteryMaskingConfig = {
 - **스타일링**: 헤더 행 강조 (굵은 글씨, 회색 배경)
 - **열 너비**: 내용에 맞게 자동 조정
 
-## 주요 개선사항 (최신 업데이트)
-
-### 1. 앱 API 추가 (2025-08-19)
-- 모바일 앱용 추첨 결과 조회 API 구현
-- 인증 불필요 (publicProcedure)
-- 개인정보 자동 마스킹 처리
-- 경품별 당첨자 그룹화 기능
-
-### 2. OrderBy 필드명 수정
-- `LotteryHistOrderBy`: totalCandidates → totalEntries (실제 DB 필드명과 일치)
-- `LotteryResultOrderBy`: openStartAt/openEndAt → displayStartAt/displayEndAt
-
-### 3. 코드 개선
-- paginationSchema 활용으로 중복 제거
-- createProgressStatusFilter 함수로 표시 기간 필터링 통일
-- 네이밍 규칙 통일 (OutputItemSchema/DetailOutputSchema 패턴)
-
-### 4. 날짜 필드 재구성
-- `openStartAt`, `openEndAt`: Lottery 모델로 이동
-- LotteryResult에서는 표시 기간만 관리
-- 날짜 필터 표준화: `createdAfter`/`createdBefore`
-
-### 5. 상품명 중복 방지
-- 추첨 생성/수정/실행 시 상품명 중복 검증
-- Set 자료구조를 사용한 고유성 체크
-- 공통 스키마 `lotteryPrizesSchema` 사용
-
-### 6. 트랜잭션 격리 수준 강화
-- Serializable 격리 수준 적용
-- 동시 추첨 실행 시 데이터 무결성 보장
-- 경품 초과 할당 방지
-
-### 7. 쿼리 성능 최적화
-- Promise.all을 사용한 병렬 쿼리
-- IN clause를 사용한 대량 데이터 처리
-- Map 자료구조로 O(1) 중복 체크
-
 ## 성능 고려사항
 
 ### 대량 참여자 처리
@@ -991,6 +1024,7 @@ export const LotteryMaskingConfig = {
 ## 추첨 실행 검증 로직
 
 ### 1. 입력 데이터 검증 (API 레벨)
+
 - 추첨 ID: UUID 형식 검증
 - 참여자 배열: 최소 1명 이상 필수
 - 경품 배열: 최소 1개 이상 필수, 상품명 중복 불가
@@ -998,24 +1032,30 @@ export const LotteryMaskingConfig = {
 - 날짜 범위: openEndAt > openStartAt 검증
 
 ### 2. 보존 기간 검증
+
 - 현재 시간이 `openEndAt + retentionDays`를 초과한 경우 LOTTERY_RETENTION_EXPIRED 에러
 - 추첨 실행 및 결과 생성 시 모두 적용
 - canExecute 플래그 계산 시에도 보존 기간 고려
 
 ### 3. 참여자 수 검증
+
 - 최소: 1명 이상 (NO_PARTICIPANTS 에러)
 - 최대: 30,000명 이하 (TOO_MANY_PARTICIPANTS 에러)
 
 ### 4. 추첨 존재 여부 검증
+
 - 추첨 ID로 조회 시 존재하지 않으면 LOTTERY_NOT_FOUND 에러
 
 ### 5. 경품 누적 사용량 검증
+
 - 각 경품이 전체 경품 풀에 존재하는지 확인 (PRIZE_NOT_FOUND 에러)
 - 이전 실행들의 누적 사용량을 계산하여 남은 수량 확인
 - 현재 요청 수량이 남은 수량을 초과하면 PRIZE_EXCEED_LIMIT 에러
 
 ### 6. 참여자 필터링 로직
+
 처리 순서 (최적화됨):
+
 1. **중복 제거** (Map 자료구조 사용, allowsDuplicateEntry=false인 경우만)
    - 이제 LotteryHist별로 설정 (추첨 실행별로 다르게 적용 가능)
 2. **병렬 쿼리** (Promise.all + IN clause):
@@ -1029,36 +1069,13 @@ export const LotteryMaskingConfig = {
    - 중복 참여는 당첨 확률을 높이지만, 실제 당첨은 1회로 제한
 
 ### 7. 최종 참여자 수 vs 경품 수 검증
+
 - allowsDuplicateEntry=true인 경우: 고유 회원 수로 검증
 - allowsDuplicateEntry=false인 경우: 전체 참여자 수로 검증
 - 필터링 후 유효한 참여자 수가 총 경품 수보다 적으면 INSUFFICIENT_PARTICIPANTS 에러
 
 ### 8. 통계 정보
+
 - `totalEntries`: 전체 참여 횟수 (중복 참여 포함)
 - `totalWinners`: 실제 당첨자 수
 - `excludedCount`: 제외된 참여 횟수 (블랙리스트와 이전 당첨자로 인한 제외)
-
-## 에러 처리
-
-모든 API는 표준 HTTP 상태 코드와 함께 에러 메시지를 반환합니다:
-
-```json
-{
-  "error": {
-    "message": "추첨을 찾을 수 없습니다",
-    "code": "NOT_FOUND"
-  }
-}
-```
-
-주요 에러 상황:
-
-- 400: 입력 데이터 검증 실패
-- 403: 권한 부족 또는 비즈니스 로직 제약 (보존 기간 만료 포함)
-- 404: 리소스를 찾을 수 없음
-- 409: 중복 데이터 또는 제약 조건 위반
-- 500: 서버 내부 오류
-
-### 주요 에러 코드
-
-- `FDE-L-203`: LOTTERY_RETENTION_EXPIRED - 추첨 보존 기간 만료
