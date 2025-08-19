@@ -103,10 +103,10 @@ export const LotteryHistParticipantOrderBy = {
 export const LotteryResultOrderBy = {
   createdAt_asc: 'createdAt_asc',
   createdAt_desc: 'createdAt_desc',
-  openStartAt_asc: 'openStartAt_asc',
-  openStartAt_desc: 'openStartAt_desc',
-  openEndAt_asc: 'openEndAt_asc',
-  openEndAt_desc: 'openEndAt_desc',
+  displayStartAt_asc: 'displayStartAt_asc',
+  displayStartAt_desc: 'displayStartAt_desc',
+  displayEndAt_asc: 'displayEndAt_asc',
+  displayEndAt_desc: 'displayEndAt_desc',
 } as const;
 ```
 
@@ -128,7 +128,7 @@ export const LotteryMaskingConfig = {
   genericStrings: [
     {
       fields: ['memName'],
-      config: { unmaskedStartCharacters: 1 },
+      config: { unmaskedStartCharacters: 1, unmaskedEndCharacters: 1 },
     },
     {
       fields: ['memNo'],
@@ -728,6 +728,118 @@ export const LotteryMaskingConfig = {
 
 - **응답**: 200 OK (본문 없음)
 
+## 앱 API 엔드포인트
+
+모바일 앱에서 사용하는 추첨 결과 조회 API입니다. 인증이 필요하지 않으며, 개인정보는 자동으로 마스킹 처리됩니다.
+
+### 앱 API 공통 정보
+
+- **인증**: 불필요 (publicProcedure)
+- **개인정보**: 자동 마스킹 처리
+- **표시 기간**: 현재 진행 중(IN_PROGRESS) 상태만 기본 표시
+
+### 앱 API 엔드포인트
+
+| 메소드 | 엔드포인트                          | 설명                           | 인증   |
+| ------ | ----------------------------------- | ------------------------------ | ------ |
+| POST   | `/external/app/lottery/results`    | 추첨 결과 목록 조회            | 불필요 |
+| GET    | `/external/app/lottery/result/get` | 추첨 결과 상세 조회 (당첨자 포함) | 불필요 |
+
+### 추첨 결과 목록 조회 (앱)
+
+현재 진행 중인 추첨 결과 목록을 반환합니다.
+
+- **요청**:
+  ```json
+  {
+    "page": 1, // [옵션] 페이지 번호, 기본값: 1
+    "pageSize": 20, // [옵션] 페이지당 항목 수, 기본값: 20
+    "orderBy": "displayStartAt_desc" // [옵션] 정렬 기준, 기본값: displayStartAt_desc
+  }
+  ```
+
+- **응답**:
+  ```json
+  {
+    "list": [
+      {
+        "id": "550e8400-e29b-41d4-a716-446655440000", // [필수] 결과 ID
+        "title": "6월 뮤지컬 당첨자 발표", // [필수] 제목
+        "displayStartAt": "2025-06-02T00:00:00Z", // [옵션] 표시 시작일
+        "displayEndAt": "2025-06-30T23:59:59Z", // [옵션] 표시 종료일
+        "lottery": {
+          "id": "lottery-123", // [필수] 추첨 ID
+          "name": "6월 뮤지컬 '마틸다' 추첨" // [필수] 추첨명
+        },
+        "createdAt": "2025-06-01T11:00:00Z" // [필수] 생성일시
+      }
+    ],
+    "page": 1,
+    "pageSize": 20,
+    "pageCount": 1,
+    "totalCount": 1
+  }
+  ```
+
+### 추첨 결과 상세 조회 (앱)
+
+추첨 결과 상세 정보와 경품별 당첨자 목록을 반환합니다. 당첨자 개인정보는 마스킹 처리됩니다.
+
+- **파라미터**:
+  - `id`: 추첨 결과 ID [필수]
+
+- **응답**:
+  ```json
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440000", // [필수] 결과 ID
+    "title": "6월 뮤지컬 당첨자 발표", // [필수] 제목
+    "images": [ // [필수] 이미지 URL 배열
+      "https://example.com/lottery-result.jpg"
+    ],
+    "instructions": "당첨자 확인 후 개별 연락드립니다.", // [옵션] 안내사항
+    "displayStartAt": "2025-06-02T00:00:00Z", // [옵션] 표시 시작일
+    "displayEndAt": "2025-06-30T23:59:59Z", // [옵션] 표시 종료일
+    "lottery": {
+      "id": "lottery-123", // [필수] 추첨 ID
+      "name": "6월 뮤지컬 '마틸다' 추첨", // [필수] 추첨명
+      "openStartAt": "2025-06-01T00:00:00Z", // [필수] 응모 시작일
+      "openEndAt": "2025-06-15T23:59:59Z" // [필수] 응모 종료일
+    },
+    "prizeWinners": [ // [필수] 경품별 당첨자 정보
+      {
+        "prizeName": "S석", // [필수] 경품명
+        "winnerCount": 20, // [필수] 당첨자 수
+        "winners": [ // [필수] 당첨자 목록 (마스킹 처리)
+          {
+            "memNo": "12****", // [필수] 회원번호 (마스킹)
+            "memName": "홍*동", // [옵션] 회원명 (마스킹)
+            "phoneNumber": "010****5678" // [옵션] 전화번호 (마스킹)
+          }
+          // ... 더 많은 당첨자
+        ]
+      },
+      {
+        "prizeName": "A석",
+        "winnerCount": 30,
+        "winners": [
+          // ... A석 당첨자 목록
+        ]
+      }
+    ]
+  }
+  ```
+
+### 앱 API 특징
+
+1. **인증 불필요**: 모든 앱 API는 인증 없이 접근 가능
+2. **자동 마스킹**: 개인정보는 LotteryMaskingConfig에 따라 자동 마스킹
+   - 이름: 첫글자와 마지막글자만 표시 (예: "홍*동")
+   - 회원번호: 앞 2자리만 표시 (예: "12****")
+   - 전화번호: 앞 5자리와 뒤 4자리만 표시 (예: "010****5678")
+3. **진행 중 필터링**: 목록 조회 시 createProgressStatusFilter를 사용하여 현재 진행 중인 결과만 표시
+4. **경품별 그룹화**: 당첨자 정보를 경품별로 그룹화하여 제공
+5. **정렬**: 기본적으로 displayStartAt 내림차순 정렬
+
 ### 5. 블랙리스트(LotteryBlacklist) 관리
 
 | 메소드 | 엔드포인트                                 | 설명                 | 인증 |
@@ -807,30 +919,40 @@ export const LotteryMaskingConfig = {
 
 ## 주요 개선사항 (최신 업데이트)
 
-### 1. 날짜 필드 재구성
+### 1. 앱 API 추가 (2025-08-19)
+- 모바일 앱용 추첨 결과 조회 API 구현
+- 인증 불필요 (publicProcedure)
+- 개인정보 자동 마스킹 처리
+- 경품별 당첨자 그룹화 기능
+
+### 2. OrderBy 필드명 수정
+- `LotteryHistOrderBy`: totalCandidates → totalEntries (실제 DB 필드명과 일치)
+- `LotteryResultOrderBy`: openStartAt/openEndAt → displayStartAt/displayEndAt
+
+### 3. 코드 개선
+- paginationSchema 활용으로 중복 제거
+- createProgressStatusFilter 함수로 표시 기간 필터링 통일
+- 네이밍 규칙 통일 (OutputItemSchema/DetailOutputSchema 패턴)
+
+### 4. 날짜 필드 재구성
 - `openStartAt`, `openEndAt`: Lottery 모델로 이동
 - LotteryResult에서는 표시 기간만 관리
 - 날짜 필터 표준화: `createdAfter`/`createdBefore`
 
-### 2. 상품명 중복 방지
+### 5. 상품명 중복 방지
 - 추첨 생성/수정/실행 시 상품명 중복 검증
 - Set 자료구조를 사용한 고유성 체크
 - 공통 스키마 `lotteryPrizesSchema` 사용
 
-### 3. 트랜잭션 격리 수준 강화
+### 6. 트랜잭션 격리 수준 강화
 - Serializable 격리 수준 적용
 - 동시 추첨 실행 시 데이터 무결성 보장
 - 경품 초과 할당 방지
 
-### 4. 쿼리 성능 최적화
+### 7. 쿼리 성능 최적화
 - Promise.all을 사용한 병렬 쿼리
 - IN clause를 사용한 대량 데이터 처리
 - Map 자료구조로 O(1) 중복 체크
-
-### 5. 스키마 네이밍 일관성
-- OutputItemSchema/DetailOutputSchema 패턴
-- ProgressStatusFilter const 사용
-- 일관된 `admin` prefix
 
 ## 성능 고려사항
 
