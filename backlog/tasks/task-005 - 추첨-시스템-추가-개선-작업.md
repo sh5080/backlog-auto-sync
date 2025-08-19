@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@seok'
 created_date: '2025-08-18 03:32'
-updated_date: '2025-08-19 15:30'
+updated_date: '2025-08-19 16:45'
 labels:
   - backend
   - database
@@ -84,6 +84,23 @@ priority: high
   - externalAdmin-lottery.ts: `lotteries` API - canExecute 계산 시 보존 기간 반영
   - externalAdmin-lottery.ts: `lotteryGet` API - canExecute 계산 시 보존 기간 반영
   - 현재 시간이 `openEndAt + retentionDays`를 초과한 경우 추첨 실행 및 결과 저장 차단
+
+- [x] 추첨 생성 API 응답 개선 (2025-08-19)
+  - externalAdmin-lottery.ts: `lotteryCreate` API 수정
+  - 응답 타입을 `z.void()`에서 `z.object({ id: z.string().uuid() })`로 변경
+  - 생성된 추첨의 ID를 반환하여 모달에서 바로 추첨 실행 페이지로 이동 가능
+
+- [x] 추첨 이력 메모 수정 API 추가 (2025-08-19)
+  - schemas-lottery.ts: `adminLotteryHistUpdateNoteInputSchema` 스키마 추가
+  - externalAdmin-lottery.ts: `lotteryHistUpdateNote` 엔드포인트 신규 구현
+  - POST `/external/admin/lottery/hist/update-note` 경로로 제공
+  - 추첨 이력의 메모(note) 필드만 독립적으로 수정 가능
+
+- [x] 추첨 이력 목록 조회 응답 개선 (2025-08-19)
+  - externalAdmin-lottery.ts: `lotteryHists` API의 include 절에 `results: true` 추가
+  - schemas-lottery.ts: `adminLotteryHistOutputItemSchema`에 `_count` 필드 추가
+  - 각 추첨 이력에 연결된 참여자(participants)와 결과(results)의 개수 제공
+  - 추첨 실행 결과 상세 페이지에서 관련 결과 존재 여부 파악 가능
 
 ## 주요 개선 효과
 

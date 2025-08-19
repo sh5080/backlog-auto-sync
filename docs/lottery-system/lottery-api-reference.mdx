@@ -336,7 +336,12 @@ export const LotteryMaskingConfig = {
   }
   ```
 
-- **응답**: 200 OK (본문 없음)
+- **응답**: 
+  ```json
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440001" // [필수] 생성된 추첨 ID
+  }
+  ```
 
 ### 추첨 수정
 
@@ -495,10 +500,11 @@ export const LotteryMaskingConfig = {
 
 ### 3. 추첨 이력(LotteryHist) 관리
 
-| 메소드 | 엔드포인트                         | 설명                | 인증 |
-| ------ | ---------------------------------- | ------------------- | ---- |
-| POST   | `/external/admin/lottery/hists`    | 추첨 이력 목록 조회 | 필요 |
-| GET    | `/external/admin/lottery/hist/get` | 추첨 이력 상세 조회 | 필요 |
+| 메소드 | 엔드포인트                              | 설명                    | 인증 |
+| ------ | --------------------------------------- | ----------------------- | ---- |
+| POST   | `/external/admin/lottery/hists`         | 추첨 이력 목록 조회      | 필요 |
+| GET    | `/external/admin/lottery/hist/get`      | 추첨 이력 상세 조회      | 필요 |
+| POST   | `/external/admin/lottery/hist/update-note` | 추첨 이력 메모 수정    | 필요 |
 
 ### 추첨 이력 목록 조회
 
@@ -547,6 +553,10 @@ export const LotteryMaskingConfig = {
           "email": "admin@lg.com",
           "name": "관리자"
         },
+        "_count": {
+          "participants": 1500, // [필수] 참여자 수
+          "results": 1 // [필수] 연결된 결과 수
+        },
         "createdAt": "2025-06-01T10:00:00Z"
       }
     ],
@@ -593,6 +603,21 @@ export const LotteryMaskingConfig = {
     "createdAt": "2025-06-01T10:00:00Z"
   }
   ```
+
+### 추첨 이력 메모 수정
+
+- **요청**:
+  ```json
+  {
+    "id": 124, // [필수] 추첨 이력 ID
+    "note": "6월 1차 추첨 - 특별 이벤트" // [옵션] 메모 내용 (null 가능)
+  }
+  ```
+
+- **응답**: 200 OK (본문 없음)
+
+- **에러**:
+  - `404 NOT_FOUND`: 추첨 이력을 찾을 수 없음
 
 ### 4. 추첨 결과(LotteryResult) 관리
 
