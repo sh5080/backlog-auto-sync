@@ -18,7 +18,7 @@
           },
           {
             "group": "추첨 시스템",
-            "pages": ["lottery-system/lottery-erd", "lottery-system/lottery-api-reference"]
+            "pages": ["lottery-system/lottery-erd", "lottery-system/lottery-api-reference", "lottery-system/lottery-future-improvements"]
           }
         ]
       }
