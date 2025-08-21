@@ -366,6 +366,11 @@ export const LotteryMaskingConfig = {
         "isActive": true,
         "displayStartAt": "2025-06-02T00:00:00Z",
         "displayEndAt": "2025-06-30T23:59:59Z",
+        "admin": {  // [필수] 등록자 정보
+          "id": "admin-456",
+          "email": "admin2@lg.com",
+          "name": "관리자2"
+        },
         "createdAt": "2025-06-01T11:00:00Z"
       }
     ],
@@ -760,7 +765,12 @@ export const LotteryMaskingConfig = {
   }
   ```
 
-- **응답**: 200 OK (본문 없음)
+- **응답**: 200 OK
+  ```json
+  {
+    "id": "result-789"  // [필수] 생성된 추첨 결과 ID
+  }
+  ```
 
 - **에러 응답**:
   - `400 BAD_REQUEST`: 입력 데이터 검증 실패
