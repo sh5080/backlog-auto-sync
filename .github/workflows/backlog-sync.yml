@@ -79,20 +79,31 @@ jobs:
             echo "has_changes=true" >> $GITHUB_ENV
             echo "✅ Changes detected: $TASK_INFO"
             echo "📝 Changes saved to /tmp/task_changes.txt"
+            echo "🔧 has_changes=true set in GITHUB_ENV"
           else
             echo "has_changes=false" >> $GITHUB_ENV
             echo "ℹ️ No changes needed"
+            echo "🔧 has_changes=false set in GITHUB_ENV"
           fi
           
           # 디버깅을 위한 출력
           echo "TASK_INFO length: ${#TASK_INFO}"
-          echo "has_changes: $has_changes"
+          echo "has_changes from env: $has_changes"
+          echo "Checking GITHUB_ENV:"
+          cat $GITHUB_ENV | grep has_changes || echo "No has_changes in GITHUB_ENV"
           
           echo "::endgroup::"
       
       - name: Rename task files
-        if: steps.parse-tasks.outputs.has_changes == 'true'
         run: |
+          # has_changes 파일 확인
+          if [ -f /tmp/task_changes.txt ]; then
+            echo "✅ Changes file found, proceeding with rename"
+          else
+            echo "ℹ️ No changes file found, skipping rename"
+            exit 0
+          fi
+          
           echo "::group::Renaming task files"
           
           # 변경사항이 있는 파일들만 처리
@@ -136,9 +147,16 @@ jobs:
           echo "::endgroup::"
       
       - name: Generate commit message
-        if: steps.parse-tasks.outputs.has_changes == 'true'
         id: commit-msg
         run: |
+          # has_changes 파일 확인
+          if [ -f /tmp/task_changes.txt ]; then
+            echo "✅ Changes file found, proceeding with commit message generation"
+          else
+            echo "ℹ️ No changes file found, skipping commit message generation"
+            exit 0
+          fi
+          
           echo "::group::Generating commit message"
           
           # 오늘 날짜 (YYMMDD 형식)
@@ -191,8 +209,15 @@ jobs:
           echo "::endgroup::"
       
       - name: Commit and push changes
-        if: steps.parse-tasks.outputs.has_changes == 'true'
         run: |
+          # has_changes 파일 확인
+          if [ -f /tmp/task_changes.txt ]; then
+            echo "✅ Changes file found, proceeding with commit and push"
+          else
+            echo "ℹ️ No changes file found, skipping commit and push"
+            exit 0
+          fi
+          
           echo "::group::Committing changes"
           
           # 변경사항 확인
@@ -212,8 +237,15 @@ jobs:
           echo "::endgroup::"
       
       - name: Create summary
-        if: steps.parse-tasks.outputs.has_changes == 'true'
         run: |
+          # has_changes 파일 확인
+          if [ -f /tmp/task_changes.txt ]; then
+            echo "✅ Changes file found, proceeding with summary creation"
+          else
+            echo "ℹ️ No changes file found, skipping summary creation"
+            exit 0
+          fi
+          
           echo "## 📋 Task Naming Sync Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "✅ Successfully synchronized task file naming" >> $GITHUB_STEP_SUMMARY
