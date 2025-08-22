@@ -1,5 +1,5 @@
 ---
-id: task-007
+id: task-008
 title: 추첨 API 개선 - 결과 생성 응답 및 상세 조회 개선
 status: Done
 assignee:
