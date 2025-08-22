@@ -73,15 +73,20 @@ jobs:
           # 임시 파일 정리
           rm -f /tmp/task_files_temp.txt
           
-          # 결과를 환경변수로 설정
+          # 결과를 파일로 저장 (환경변수 대신)
           if [ -n "$TASK_INFO" ]; then
-            echo "TASK_INFO<<EOF" >> $GITHUB_ENV
-            echo -e "$TASK_INFO" >> $GITHUB_ENV
-            echo "EOF" >> $GITHUB_ENV
+            echo -e "$TASK_INFO" > /tmp/task_changes.txt
             echo "has_changes=true" >> $GITHUB_ENV
+            echo "✅ Changes detected: $TASK_INFO"
+            echo "📝 Changes saved to /tmp/task_changes.txt"
           else
             echo "has_changes=false" >> $GITHUB_ENV
+            echo "ℹ️ No changes needed"
           fi
+          
+          # 디버깅을 위한 출력
+          echo "TASK_INFO length: ${#TASK_INFO}"
+          echo "has_changes: $has_changes"
           
           echo "::endgroup::"
       
@@ -91,22 +96,26 @@ jobs:
           echo "::group::Renaming task files"
           
           # 변경사항이 있는 파일들만 처리
-          echo "$TASK_INFO" | while IFS='|' read -r counter old_path new_name title; do
-            if [ -n "$counter" ] && [ -n "$old_path" ] && [ -n "$new_name" ]; then
-              echo "Renaming: $old_path -> $new_name"
-              
-              # 새 경로 생성
-              new_path="backlog/tasks/$new_name"
-              
-              # 파일 이동
-              git mv "$old_path" "$new_path"
-              
-              # 파일 내용의 ID 업데이트
-              sed -i "s/^id: task-[0-9]*/id: task-$(printf "%03d" $counter)/" "$new_path"
-              
-              echo "Updated ID in: $new_path"
-            fi
-          done
+          if [ -f /tmp/task_changes.txt ]; then
+            while IFS='|' read -r counter old_path new_name title; do
+              if [ -n "$counter" ] && [ -n "$old_path" ] && [ -n "$new_name" ]; then
+                echo "Renaming: $old_path -> $new_name"
+                
+                # 새 경로 생성
+                new_path="backlog/tasks/$new_name"
+                
+                # 파일 이동
+                git mv "$old_path" "$new_path"
+                
+                # 파일 내용의 ID 업데이트
+                sed -i "s/^id: task-[0-9]*/id: task-$(printf "%03d" $counter)/" "$new_path"
+                
+                echo "Updated ID in: $new_path"
+              fi
+            done < /tmp/task_changes.txt
+          else
+            echo "❌ No changes file found"
+          fi
           
           echo "::endgroup::"
       
@@ -139,23 +148,27 @@ jobs:
           ASSIGNEE_COUNT=""
           declare -A assignee_dates
           
-          echo "$TASK_INFO" | while IFS='|' read -r counter old_path new_name title; do
-            if [ -n "$counter" ] && [ -n "$old_path" ] && [ -n "$new_name" ]; then
-              # 파일에서 assignee 추출
-              ASSIGNEE=$(grep -m 1 "^assignee:" "$old_path" | sed 's/^assignee:\s*//' | sed 's/^\[//' | sed 's/\]$//' | sed 's/@//g')
-              
-              if [ -n "$ASSIGNEE" ]; then
-                # assignee별로 날짜 카운트 증가
-                if [ -z "${assignee_dates[$ASSIGNEE]}" ]; then
-                  assignee_dates[$ASSIGNEE]=1
-                else
-                  assignee_dates[$ASSIGNEE]=$((${assignee_dates[$ASSIGNEE]} + 1))
-                fi
+          if [ -f /tmp/task_changes.txt ]; then
+            while IFS='|' read -r counter old_path new_name title; do
+              if [ -n "$counter" ] && [ -n "$old_path" ] && [ -n "$new_name" ]; then
+                # 파일에서 assignee 추출
+                ASSIGNEE=$(grep -m 1 "^assignee:" "$old_path" | sed 's/^assignee:\s*//' | sed 's/^\[//' | sed 's/\]$//' | sed 's/@//g')
                 
-                echo "Found assignee: $ASSIGNEE for task $counter"
+                if [ -n "$ASSIGNEE" ]; then
+                  # assignee별로 날짜 카운트 증가
+                  if [ -z "${assignee_dates[$ASSIGNEE]}" ]; then
+                    assignee_dates[$ASSIGNEE]=1
+                  else
+                    assignee_dates[$ASSIGNEE]=$((${assignee_dates[$ASSIGNEE]} + 1))
+                  fi
+                  
+                  echo "Found assignee: $ASSIGNEE for task $counter"
+                fi
               fi
-            fi
-          done
+            done < /tmp/task_changes.txt
+          else
+            echo "❌ No changes file found for assignee extraction"
+          fi
           
           # assignee별 커밋 메시지 생성
           COMMIT_MESSAGES=""
@@ -208,11 +221,15 @@ jobs:
           echo "**Changes made:**" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           
-          echo "$TASK_INFO" | while IFS='|' read -r counter old_path new_name title; do
-            if [ -n "$counter" ] && [ -n "$old_path" ] && [ -n "$new_name" ]; then
-              echo "- `$old_path` → `$new_name`" >> $GITHUB_STEP_SUMMARY
-            fi
-          done
+          if [ -f /tmp/task_changes.txt ]; then
+            while IFS='|' read -r counter old_path new_name title; do
+              if [ -n "$counter" ] && [ -n "$old_path" ] && [ -n "$new_name" ]; then
+                echo "- `$old_path` → `$new_name`" >> $GITHUB_STEP_SUMMARY
+              fi
+            done < /tmp/task_changes.txt
+          else
+            echo "- No changes file found" >> $GITHUB_STEP_SUMMARY
+          fi
           
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Total tasks processed:** $(find backlog/tasks -name "task-*.md" | wc -l)" >> $GITHUB_STEP_SUMMARY
