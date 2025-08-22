@@ -1,7 +1,14 @@
 ---
+id: task-010
 title: 백로그 태스크 번호 충돌 방지
-status: 'icebox'
-assignee: '@seunghwan'
+status: 'In Progress'
+assignee:
+  - '@seunghwan'
+created_date: '2025-08-22 13:00'
+updated_date: '2025-08-22 13:37'
+labels: []
+dependencies: []
+priority: medium
 ---
 
 ## 설명
