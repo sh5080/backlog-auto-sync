@@ -80,6 +80,25 @@ jobs:
             echo "✅ Changes detected: $TASK_INFO"
             echo "📝 Changes saved to /tmp/task_changes.txt"
             echo "🔧 has_changes=true set in GITHUB_ENV"
+            
+            # 요약 정보도 함께 생성
+            echo "## 📋 Task Naming Sync Summary" > /tmp/summary.txt
+            echo "" >> /tmp/summary.txt
+            echo "✅ Successfully synchronized task file naming" >> /tmp/summary.txt
+            echo "" >> /tmp/summary.txt
+            echo "**Changes made:**" >> /tmp/summary.txt
+            echo "" >> /tmp/summary.txt
+            
+            # 변경사항 파싱하여 요약에 추가
+            echo -e "$TASK_INFO" | while IFS='|' read -r counter old_path new_name title; do
+              if [ -n "$counter" ] && [ -n "$old_path" ] && [ -n "$new_name" ]; then
+                echo "- \`$old_path\` → \`$new_name\`" >> /tmp/summary.txt
+              fi
+            done
+            
+            echo "" >> /tmp/summary.txt
+            echo "**Total tasks processed:** $(find backlog/tasks -name "task-*.md" | wc -l)" >> /tmp/summary.txt
+            
           else
             echo "has_changes=false" >> $GITHUB_ENV
             echo "ℹ️ No changes needed"
@@ -246,31 +265,32 @@ jobs:
             exit 0
           fi
           
-          echo "## 📋 Task Naming Sync Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "✅ Successfully synchronized task file naming" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Changes made:**" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          
-          if [ -f /tmp/task_changes.txt ]; then
-            while IFS='|' read -r counter old_path new_name title; do
-              if [ -n "$counter" ] && [ -n "$old_path" ] && [ -n "$new_name" ]; then
-                echo "- `$old_path` → `$new_name`" >> $GITHUB_STEP_SUMMARY
-              fi
-            done < /tmp/task_changes.txt
+          # 미리 생성된 요약 파일 사용
+          if [ -f /tmp/summary.txt ]; then
+            echo "📝 Using pre-generated summary from /tmp/summary.txt"
+            cat /tmp/summary.txt >> $GITHUB_STEP_SUMMARY
           else
-            echo "- No changes file found" >> $GITHUB_STEP_SUMMARY
+            echo "❌ Summary file not found, creating basic summary"
+            echo "## 📋 Task Naming Sync Summary" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "✅ Successfully synchronized task file naming" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Changes made:** (Summary file not found)" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Total tasks processed:** $(find backlog/tasks -name "task-*.md" | wc -l)" >> $GITHUB_STEP_SUMMARY
           fi
-          
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Total tasks processed:** $(find backlog/tasks -name "task-*.md" | wc -l)" >> $GITHUB_STEP_SUMMARY
       
       - name: No changes needed
-        if: steps.parse-tasks.outputs.has_changes == 'false'
         run: |
-          echo "## 📋 Task Naming Sync Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "✅ No changes needed - all task files are properly named" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "All task files follow the naming convention: `task-XXX - Title.md`" >> $GITHUB_STEP_SUMMARY
+          # has_changes 파일 확인
+          if [ ! -f /tmp/task_changes.txt ]; then
+            echo "✅ No changes needed - all task files are properly named"
+            echo "## 📋 Task Naming Sync Summary" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "✅ No changes needed - all task files are properly named" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "All task files follow the naming convention: \`task-XXX - Title.md\`" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "ℹ️ Changes file found, this step is not needed"
+            exit 0
+          fi
