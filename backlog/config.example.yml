@@ -1,0 +1,29 @@
+project_name: "LG 멤버십"
+default_status: "To Do"
+statuses: ["To Do", "In Progress", "Done"]
+labels: []
+milestones: []
+date_format: yyyy-mm-dd
+max_column_width: 20
+auto_open_browser: true
+default_port: 6420
+remote_operations: true
+auto_commit: false
+zero_padded_ids: 3
+bypass_git_hooks: true
+check_active_branches: true
+active_branch_days: 30
+
+# MS Teams 웹훅 설정 예시
+# 실제 사용 시 config.yml로 복사하고 URL을 설정하세요
+webhooks:
+  enabled: true
+  assignees:
+    nickname:
+      url: "YOUR_LOGIC_APP_URL_HERE" 
+      events:
+        - task_created
+        - task_updated
+        - task_status_changed
+      format: "teams"
+      type: "channel"
